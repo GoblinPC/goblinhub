@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
-import type { Inventory } from '../types'
+import type { Inventory, Professions } from '../types'
 import { playMining, startMineAmbience, stopMineAmbience } from '../sounds'
-
-const EXPEDITION_MS = 5000
+import { addProfessionXp, expeditionMs, xpProgress, xpToNextLevel } from '../store'
 
 function rollLoot(): { item: keyof Inventory; amount: number } | null {
   const r = Math.random()
@@ -35,14 +34,18 @@ const DUST = [
 
 interface Props {
   inventory: Inventory
-  onUpdate: (inv: Inventory) => void
+  professions: Professions
+  onUpdate: (inv: Inventory, profs: Professions) => void
   onBack: () => void
 }
 
-export default function Mine({ inventory, onUpdate, onBack }: Props) {
+export default function Mine({ inventory, professions, onUpdate, onBack }: Props) {
   const [status, setStatus] = useState<'idle' | 'running' | 'done'>('idle')
   const [progress, setProgress] = useState(0)
   const [loot, setLoot] = useState<{ item: keyof Inventory; amount: number } | null>(null)
+
+  const prof = professions.miner
+  const duration = expeditionMs(prof)
 
   useEffect(() => {
     startMineAmbience()
@@ -53,7 +56,7 @@ export default function Mine({ inventory, onUpdate, onBack }: Props) {
     if (status !== 'running') return
     const start = Date.now()
     const tick = setInterval(() => {
-      const pct = Math.min((Date.now() - start) / EXPEDITION_MS * 100, 100)
+      const pct = Math.min((Date.now() - start) / duration * 100, 100)
       setProgress(pct)
       if (pct >= 100) {
         clearInterval(tick)
@@ -72,15 +75,20 @@ export default function Mine({ inventory, onUpdate, onBack }: Props) {
   }
 
   function handleCollect() {
-    if (loot) onUpdate({ ...inventory, copperOre: inventory.copperOre + loot.amount })
+    const newProfs = addProfessionXp(professions, 'miner', 20, true)
+    const newInv = loot ? { ...inventory, copperOre: inventory.copperOre + loot.amount } : inventory
+    onUpdate(newInv, newProfs)
     setLoot(null)
     setStatus('idle')
     setProgress(0)
   }
 
   const secondsLeft = status === 'running'
-    ? Math.max(0, Math.ceil((EXPEDITION_MS - progress / 100 * EXPEDITION_MS) / 1000))
+    ? Math.max(0, Math.ceil((duration - progress / 100 * duration) / 1000))
     : 0
+
+  const xpPct = xpProgress(prof.xp, prof.level) * 100
+  const xpNeeded = xpToNextLevel(prof.level)
 
   return (
     <div className="screen-enter" style={{ position: 'relative', width: '100%', height: '100dvh', overflow: 'hidden' }}>
@@ -135,9 +143,18 @@ export default function Mine({ inventory, onUpdate, onBack }: Props) {
           </div>
           <p style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#507090', margin: '2px 0 0', fontStyle: 'italic' }}>Głębiny pełne kryształów</p>
         </div>
-        <div style={{ marginLeft: 'auto', background: 'rgba(5,8,20,0.75)', border: '1px solid rgba(60,100,200,0.4)', borderRadius: '10px', padding: '6px 12px', backdropFilter: 'blur(6px)' }}>
-          <span style={{ fontFamily: 'Cinzel', fontSize: '11px', color: '#6080b0' }}>🪨</span>
-          <span style={{ fontFamily: 'Cinzel', fontSize: '16px', fontWeight: 700, color: '#80a0d0', marginLeft: 6 }}>{inventory.copperOre}</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+          <div style={{ background: 'rgba(5,8,20,0.75)', border: '1px solid rgba(60,100,200,0.4)', borderRadius: '10px', padding: '4px 10px', backdropFilter: 'blur(6px)' }}>
+            <span style={{ fontFamily: 'Cinzel', fontSize: '11px', color: '#6080b0' }}>🪨</span>
+            <span style={{ fontFamily: 'Cinzel', fontSize: '15px', fontWeight: 700, color: '#80a0d0', marginLeft: 5 }}>{inventory.copperOre}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontFamily: 'Cinzel', fontSize: '10px', color: '#3a5070' }}>⛏ lv.{prof.level}</span>
+            <div style={{ width: 60, height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${xpPct}%`, background: 'linear-gradient(90deg,#1a3060,#4080d0)', borderRadius: 2, boxShadow: '0 0 4px rgba(60,120,255,0.5)', transition: 'width 0.3s' }} />
+            </div>
+            <span style={{ fontFamily: 'Cinzel', fontSize: '9px', color: '#2a3850' }}>{prof.xp % xpNeeded}/{xpNeeded}</span>
+          </div>
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
-import type { Inventory } from '../types'
+import type { Inventory, Professions } from '../types'
 import { playSmithing, startForgeAmbience, stopForgeAmbience } from '../sounds'
+import { addProfessionXp, xpProgress, xpToNextLevel } from '../store'
 
 // Iskry lecące w górę z paleniska
 const EMBERS = [
@@ -15,15 +16,20 @@ const EMBERS = [
 
 interface Props {
   inventory: Inventory
-  onUpdate: (inv: Inventory) => void
+  professions: Professions
+  onUpdate: (inv: Inventory, profs: Professions) => void
   onBack: () => void
 }
 
-export default function Forge({ inventory, onUpdate, onBack }: Props) {
+export default function Forge({ inventory, professions, onUpdate, onBack }: Props) {
   useEffect(() => {
     startForgeAmbience()
     return () => stopForgeAmbience()
   }, [])
+
+  const prof = professions.blacksmith
+  const xpPct = xpProgress(prof.xp, prof.level) * 100
+  const xpNeeded = xpToNextLevel(prof.level)
 
   const canLight = inventory.wood >= 1
   const canSmelt = inventory.forgeEmber >= 1 && inventory.copperOre >= 2
@@ -31,18 +37,20 @@ export default function Forge({ inventory, onUpdate, onBack }: Props) {
   function handleLight() {
     if (!canLight) return
     playSmithing()
-    onUpdate({ ...inventory, wood: inventory.wood - 1, forgeEmber: inventory.forgeEmber + 1 })
+    const newProfs = addProfessionXp(professions, 'blacksmith', 10)
+    onUpdate({ ...inventory, wood: inventory.wood - 1, forgeEmber: inventory.forgeEmber + 1 }, newProfs)
   }
 
   function handleSmelt() {
     if (!canSmelt) return
     playSmithing()
+    const newProfs = addProfessionXp(professions, 'blacksmith', 25)
     onUpdate({
       ...inventory,
       forgeEmber: inventory.forgeEmber - 1,
       copperOre: inventory.copperOre - 2,
       copperBar: inventory.copperBar + 1,
-    })
+    }, newProfs)
   }
 
   return (
@@ -118,6 +126,15 @@ export default function Forge({ inventory, onUpdate, onBack }: Props) {
             <h2 style={{ fontFamily: 'Cinzel', fontSize: '20px', fontWeight: 700, color: '#f0c060', margin: 0, textShadow: '0 0 16px rgba(240,140,20,0.6)' }}>Kuźnia</h2>
           </div>
           <p style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#7a5030', margin: '2px 0 0', fontStyle: 'italic' }}>Gorące palenisko goblinich kowali</p>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+          <span style={{ fontFamily: 'Cinzel', fontSize: '10px', color: '#7a5030' }}>🔨 Kowal lv.{prof.level}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 70, height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${xpPct}%`, background: 'linear-gradient(90deg,#8a4010,#e08030)', borderRadius: 2, boxShadow: '0 0 4px rgba(220,120,30,0.5)', transition: 'width 0.3s' }} />
+            </div>
+            <span style={{ fontFamily: 'Cinzel', fontSize: '9px', color: '#5a3820' }}>{prof.xp % xpNeeded}/{xpNeeded}</span>
+          </div>
         </div>
       </div>
 

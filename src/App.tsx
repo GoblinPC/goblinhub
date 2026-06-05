@@ -1,57 +1,71 @@
 import { useState, useEffect } from 'react'
-import type { Screen, Inventory } from './types'
-import { loadInventory, saveInventory, resetInventory } from './store'
+import type { Screen, GameState } from './types'
+import { loadState, saveState, resetState } from './store'
 import Settlement from './components/Settlement'
 import Forest from './components/Forest'
 import Mine from './components/Mine'
 import Forge from './components/Forge'
 import InventoryScreen from './components/InventoryScreen'
+import CharacterScreen from './components/CharacterScreen'
 import DevPanel from './components/DevPanel'
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('settlement')
-  const [inventory, setInventory] = useState<Inventory>(loadInventory)
+  const [state, setState] = useState<GameState>(loadState)
 
   useEffect(() => {
-    saveInventory(inventory)
-  }, [inventory])
-
-  function handleUpdate(inv: Inventory) {
-    setInventory(inv)
-  }
+    saveState(state)
+  }, [state])
 
   function handleReset() {
-    setInventory(resetInventory())
+    setState(resetState())
     setScreen('settlement')
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100dvh',
-        width: '100%',
-        maxWidth: '480px',
-        margin: '0 auto',
-        background: 'radial-gradient(ellipse at 50% 0%, #2a1a08 0%, #0e0b08 60%)',
-        overflowX: 'hidden',
-        overflowY: 'auto',
-        position: 'relative',
-      }}
-    >
+    <div style={{
+      minHeight: '100dvh', width: '100%', maxWidth: '480px',
+      margin: '0 auto',
+      background: 'radial-gradient(ellipse at 50% 0%, #2a1a08 0%, #0e0b08 60%)',
+      overflowX: 'hidden', overflowY: 'auto', position: 'relative',
+    }}>
       {screen === 'settlement' && (
-        <Settlement inventory={inventory} onNavigate={setScreen} />
+        <Settlement inventory={state.inventory} onNavigate={setScreen} />
       )}
       {screen === 'forest' && (
-        <Forest inventory={inventory} onUpdate={handleUpdate} onBack={() => setScreen('settlement')} />
+        <Forest
+          inventory={state.inventory}
+          professions={state.professions}
+          onUpdate={(inv, profs) => setState(s => ({ ...s, inventory: inv, professions: profs }))}
+          onBack={() => setScreen('settlement')}
+        />
       )}
       {screen === 'mine' && (
-        <Mine inventory={inventory} onUpdate={handleUpdate} onBack={() => setScreen('settlement')} />
+        <Mine
+          inventory={state.inventory}
+          professions={state.professions}
+          onUpdate={(inv, profs) => setState(s => ({ ...s, inventory: inv, professions: profs }))}
+          onBack={() => setScreen('settlement')}
+        />
       )}
       {screen === 'forge' && (
-        <Forge inventory={inventory} onUpdate={handleUpdate} onBack={() => setScreen('settlement')} />
+        <Forge
+          inventory={state.inventory}
+          professions={state.professions}
+          onUpdate={(inv, profs) => setState(s => ({ ...s, inventory: inv, professions: profs }))}
+          onBack={() => setScreen('settlement')}
+        />
       )}
       {screen === 'inventory' && (
-        <InventoryScreen inventory={inventory} onBack={() => setScreen('settlement')} />
+        <InventoryScreen inventory={state.inventory} onBack={() => setScreen('settlement')} />
+      )}
+      {screen === 'character' && (
+        <CharacterScreen
+          equip={state.equip}
+          tools={state.tools}
+          onUpdate={(equip, tools) => setState(s => ({ ...s, equip, tools }))}
+          onBack={() => setScreen('settlement')}
+        />
       )}
 
       <DevPanel onReset={handleReset} />

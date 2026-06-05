@@ -1,29 +1,140 @@
-import type { Inventory } from './types'
+import type { Inventory, Professions, ProfessionKey, ProfessionStats, GameState, EquipSlots, ToolSlots } from './types'
 
-const KEY = 'goblinhub_inventory'
+// ─── Defaults ─────────────────────────────────────────────────────────────────
 
-const DEFAULT: Inventory = {
+const DEFAULT_INVENTORY: Inventory = {
   wood: 0,
   copperOre: 0,
   copperBar: 0,
   forgeEmber: 0,
+  herbs: 0,
+  fish: 0,
 }
 
-export function loadInventory(): Inventory {
-  try {
-    const raw = localStorage.getItem(KEY)
-    if (!raw) return { ...DEFAULT }
-    return { ...DEFAULT, ...JSON.parse(raw) }
-  } catch {
-    return { ...DEFAULT }
+const DEFAULT_EQUIP: EquipSlots = {
+  weapon: null, helmet: null, armor: null, shield: null,
+  gloves: null, ring: null, boots: null, cloak: null, amulet: null,
+}
+
+const DEFAULT_TOOLS: ToolSlots = {
+  axe: null, pickaxe: null, fishingRod: null, shovel: null, hammer: null,
+}
+
+const PROFESSION_KEYS: ProfessionKey[] = ['woodcutter', 'miner', 'blacksmith', 'herbalist', 'fisher', 'warrior']
+
+const defaultProf = (): ProfessionStats => ({ xp: 0, level: 1, expeditions: 0 })
+
+const DEFAULT_PROFESSIONS = (): Professions =>
+  Object.fromEntries(PROFESSION_KEYS.map(k => [k, defaultProf()])) as Professions
+
+// ─── XP / Level helpers ───────────────────────────────────────────────────────
+
+// XP potrzebne do wejścia na dany poziom od zera: level * 100
+// lvl1→0xp, lvl2→100xp, lvl3→300xp, lvl4→600xp...
+export function xpForLevel(level: number): number {
+  return ((level - 1) * level) / 2 * 100
+}
+
+export function xpToNextLevel(level: number): number {
+  return level * 100
+}
+
+export function xpProgress(xp: number, level: number): number {
+  const base = xpForLevel(level)
+  const needed = xpToNextLevel(level)
+  return Math.min((xp - base) / needed, 1)
+}
+
+// Oblicza poziom na podstawie łącznego XP
+function calcLevel(xp: number): number {
+  let level = 1
+  while (xp >= xpForLevel(level + 1)) level++
+  return level
+}
+
+// ─── Expedition duration ──────────────────────────────────────────────────────
+
+// base 5s + 0.5s co 10 wypraw danej profesji - 0.4s za każdy poziom, min 3s
+export function expeditionMs(prof: ProfessionStats): number {
+  const base = 5000
+  const penalty = Math.floor(prof.expeditions / 10) * 500
+  const bonus = (prof.level - 1) * 400
+  return Math.max(base + penalty - bonus, 3000)
+}
+
+// ─── Add XP ───────────────────────────────────────────────────────────────────
+
+export function addProfessionXp(
+  professions: Professions,
+  key: ProfessionKey,
+  xp: number,
+  incrementExpedition = false,
+): Professions {
+  const prev = professions[key]
+  const newXp = prev.xp + xp
+  const newLevel = calcLevel(newXp)
+  return {
+    ...professions,
+    [key]: {
+      xp: newXp,
+      level: newLevel,
+      expeditions: incrementExpedition ? prev.expeditions + 1 : prev.expeditions,
+    },
   }
 }
 
-export function saveInventory(inv: Inventory): void {
-  localStorage.setItem(KEY, JSON.stringify(inv))
+export function calcCharacterLevel(professions: Professions): { xp: number; level: number } {
+  const totalXp = Object.values(professions).reduce((sum, p) => sum + p.xp, 0)
+  return { xp: totalXp, level: calcLevel(totalXp) }
 }
 
-export function resetInventory(): Inventory {
-  localStorage.removeItem(KEY)
-  return { ...DEFAULT }
+// ─── Persist ──────────────────────────────────────────────────────────────────
+
+const KEY = 'goblinhub_v2'
+
+export function loadState(): GameState {
+  try {
+    const raw = localStorage.getItem(KEY)
+    if (!raw) return makeDefault()
+    const parsed = JSON.parse(raw)
+    // Merge defaults so new fields always exist
+    const professions = { ...DEFAULT_PROFESSIONS() }
+    for (const k of PROFESSION_KEYS) {
+      if (parsed.professions?.[k]) professions[k] = { ...defaultProf(), ...parsed.professions[k] }
+    }
+    const inventory = { ...DEFAULT_INVENTORY, ...(parsed.inventory ?? {}) }
+    const equip = { ...DEFAULT_EQUIP, ...(parsed.equip ?? {}) }
+    const tools = { ...DEFAULT_TOOLS, ...(parsed.tools ?? {}) }
+    const { xp, level } = calcCharacterLevel(professions)
+    return { inventory, professions, characterXp: xp, characterLevel: level, equip, tools }
+  } catch {
+    return makeDefault()
+  }
 }
+
+export function saveState(state: GameState): void {
+  localStorage.setItem(KEY, JSON.stringify({
+    inventory: state.inventory,
+    professions: state.professions,
+    equip: state.equip,
+    tools: state.tools,
+  }))
+}
+
+export function makeDefault(): GameState {
+  const professions = DEFAULT_PROFESSIONS()
+  return {
+    inventory: { ...DEFAULT_INVENTORY },
+    professions,
+    characterXp: 0,
+    characterLevel: 1,
+    equip: { ...DEFAULT_EQUIP },
+    tools: { ...DEFAULT_TOOLS },
+  }
+}
+
+export function resetState(): GameState {
+  localStorage.removeItem(KEY)
+  return makeDefault()
+}
+

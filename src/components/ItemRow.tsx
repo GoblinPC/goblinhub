@@ -5,6 +5,8 @@ export const ITEM_LABELS: Record<keyof Inventory, string> = {
   copperOre: 'Ruda miedzi',
   copperBar: 'Sztabka miedzi',
   forgeEmber: 'Żar Kuźni',
+  herbs: 'Zioła',
+  fish: 'Ryby',
 }
 
 export const ITEM_COLORS: Record<keyof Inventory, string> = {
@@ -12,6 +14,8 @@ export const ITEM_COLORS: Record<keyof Inventory, string> = {
   copperOre: '#c07850',
   copperBar: '#e09050',
   forgeEmber: '#f06020',
+  herbs: '#60a840',
+  fish: '#4090c0',
 }
 
 export const ITEM_ICONS: Record<keyof Inventory, string> = {
@@ -19,6 +23,8 @@ export const ITEM_ICONS: Record<keyof Inventory, string> = {
   copperOre: '🪨',
   copperBar: '🔶',
   forgeEmber: '🔥',
+  herbs: '🌿',
+  fish: '🐟',
 }
 
 interface Props {

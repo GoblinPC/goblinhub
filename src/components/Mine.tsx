@@ -1,19 +1,17 @@
-import { useState } from 'react'
-import type { Inventory, DiceResult } from '../types'
-import DiceRoll from './DiceRoll'
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import type { Inventory } from '../types'
 import { playMining, startMineAmbience, stopMineAmbience } from '../sounds'
 
-function rollMine(): DiceResult {
-  const roll = Math.floor(Math.random() * 20) + 1
-  let loot: DiceResult['loot'] = null
-  if (roll >= 16 && roll <= 19) loot = { item: 'copperOre', amount: 2 }
-  else if (roll === 20) loot = { item: 'copperOre', amount: 3 }
-  else if (roll >= 6) loot = { item: 'copperOre', amount: 1 }
-  return { roll, loot }
+const EXPEDITION_MS = 5000
+
+function rollLoot(): { item: keyof Inventory; amount: number } | null {
+  const r = Math.random()
+  if (r < 0.25) return null
+  if (r < 0.75) return { item: 'copperOre', amount: 1 }
+  if (r < 0.95) return { item: 'copperOre', amount: 2 }
+  return { item: 'copperOre', amount: 3 }
 }
 
-// Kryształy niebieskie – pozycje z grafiki
 const CRYSTALS = [
   { left: '46%', top:  '6%', size: '22%', h: '11%', delay: '0s'   },
   { left: '80%', top: '83%', size: '16%', h: '8%',  delay: '0.8s' },
@@ -21,14 +19,12 @@ const CRYSTALS = [
   { left: '65%', top: '55%', size: '10%', h: '6%',  delay: '2s'   },
 ]
 
-// Latarnie
 const LANTERNS = [
   { left: '22%', top: '28%', delay: '0s'   },
   { left: '62%', top: '22%', delay: '0.5s' },
   { left: '84%', top: '38%', delay: '1.1s' },
 ]
 
-// Pył kopalni
 const DUST = [
   { left: '30%', top: '40%', delay: '0s',   dur: '6s'  },
   { left: '55%', top: '30%', delay: '1.5s', dur: '5s'  },
@@ -44,36 +40,54 @@ interface Props {
 }
 
 export default function Mine({ inventory, onUpdate, onBack }: Props) {
-  const [result, setResult] = useState<DiceResult | null>(null)
-  const [rolling, setRolling] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'running' | 'done'>('idle')
+  const [progress, setProgress] = useState(0)
+  const [loot, setLoot] = useState<{ item: keyof Inventory; amount: number } | null>(null)
 
   useEffect(() => {
     startMineAmbience()
     return () => stopMineAmbience()
   }, [])
 
-  function handleMine() {
-    if (rolling) return
-    playMining()
-    setRolling(true)
-    setResult(rollMine())
+  useEffect(() => {
+    if (status !== 'running') return
+    const start = Date.now()
+    const tick = setInterval(() => {
+      const pct = Math.min((Date.now() - start) / EXPEDITION_MS * 100, 100)
+      setProgress(pct)
+      if (pct >= 100) {
+        clearInterval(tick)
+        const result = rollLoot()
+        setLoot(result)
+        setStatus('done')
+        playMining()
+      }
+    }, 50)
+    return () => clearInterval(tick)
+  }, [status])
+
+  function handleSend() {
+    setStatus('running')
+    setProgress(0)
   }
 
-  function handleDone() {
-    if (result?.loot) {
-      onUpdate({ ...inventory, copperOre: inventory.copperOre + result.loot.amount })
-    }
-    setRolling(false)
+  function handleCollect() {
+    if (loot) onUpdate({ ...inventory, copperOre: inventory.copperOre + loot.amount })
+    setLoot(null)
+    setStatus('idle')
+    setProgress(0)
   }
+
+  const secondsLeft = status === 'running'
+    ? Math.max(0, Math.ceil((EXPEDITION_MS - progress / 100 * EXPEDITION_MS) / 1000))
+    : 0
 
   return (
     <div className="screen-enter" style={{ position: 'relative', width: '100%', height: '100dvh', overflow: 'hidden' }}>
 
-      {/* Tło */}
       <img src="/assets/backgrounds/mine.webp" alt="" draggable={false}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', pointerEvents: 'none', userSelect: 'none' }} />
 
-      {/* Kryształy */}
       {CRYSTALS.map((c, i) => (
         <div key={i} style={{
           position: 'absolute', left: c.left, top: c.top, width: c.size, height: c.h,
@@ -84,7 +98,6 @@ export default function Mine({ inventory, onUpdate, onBack }: Props) {
         }} />
       ))}
 
-      {/* Latarnie */}
       {LANTERNS.map((l, i) => (
         <div key={i} style={{
           position: 'absolute', left: l.left, top: l.top,
@@ -97,7 +110,6 @@ export default function Mine({ inventory, onUpdate, onBack }: Props) {
         }} />
       ))}
 
-      {/* Pył kopalniany */}
       {DUST.map((d, i) => (
         <div key={i} style={{
           position: 'absolute', left: d.left, top: d.top,
@@ -109,10 +121,7 @@ export default function Mine({ inventory, onUpdate, onBack }: Props) {
         }} />
       ))}
 
-      {/* Ciemny ambient – niebieskie ściany */}
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(5,10,30,0.25) 100%)', pointerEvents: 'none' }} />
-
-      {/* Gradient góra */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '110px',
         background: 'linear-gradient(180deg, rgba(2,4,15,0.88) 0%, transparent 100%)', pointerEvents: 'none' }} />
 
@@ -137,23 +146,65 @@ export default function Mine({ inventory, onUpdate, onBack }: Props) {
         background: 'linear-gradient(0deg, rgba(2,4,15,0.97) 0%, rgba(4,8,25,0.92) 60%, transparent 100%)',
         padding: '0 16px 32px' }}>
 
-        <div style={{ minHeight: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 0 8px' }}>
-          {result ? (
-            <DiceRoll result={result} onDone={handleDone} />
-          ) : (
+        <div style={{ minHeight: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px 0 12px', gap: 12 }}>
+
+          {status === 'idle' && (
             <p style={{ fontFamily: 'Crimson Text', fontSize: '16px', color: '#2a3850', fontStyle: 'italic', margin: 0 }}>
-              Chwyć kilof i uderzaj w ścianę...
+              Wyślij górnika w głąb kopalni...
             </p>
+          )}
+
+          {status === 'running' && (
+            <>
+              <p style={{ fontFamily: 'Crimson Text', fontSize: '15px', color: '#4a6080', fontStyle: 'italic', margin: 0 }}>
+                Górnik kopie... {secondsLeft}s
+              </p>
+              <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.07)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: '4px',
+                  background: 'linear-gradient(90deg, #1a3060, #4080d0)',
+                  width: `${progress}%`,
+                  transition: 'width 0.05s linear',
+                  boxShadow: '0 0 8px rgba(60,120,255,0.5)',
+                }} />
+              </div>
+            </>
+          )}
+
+          {status === 'done' && (
+            loot ? (
+              <div className="loot-pop" style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                background: 'rgba(20,40,100,0.25)', border: '1px solid rgba(60,120,200,0.35)',
+                borderRadius: '12px', padding: '14px 24px', width: '100%',
+              }}>
+                <span style={{ fontFamily: 'Cinzel', fontWeight: 700, fontSize: '26px', color: '#80a0d0' }}>+{loot.amount}</span>
+                <span style={{ fontSize: '22px' }}>🪨</span>
+                <span style={{ fontFamily: 'Crimson Text', fontSize: '17px', color: '#90b0d0' }}>Ruda miedzi</span>
+              </div>
+            ) : (
+              <div style={{
+                fontFamily: 'Cinzel', fontSize: '14px', color: '#2a3850',
+                background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(40,60,100,0.3)',
+                borderRadius: '12px', padding: '14px 24px', width: '100%', textAlign: 'center',
+              }}>
+                Górnik wrócił z pustymi rękami
+              </div>
+            )
           )}
         </div>
 
-        <button className="btn-primary" onClick={handleMine} disabled={rolling}
-          style={{ marginBottom: '8px', background: rolling ? undefined : 'linear-gradient(135deg, #1a3060, #2a50a0)', borderColor: rolling ? undefined : '#4080d0' }}>
-          {rolling ? 'Kopiesz...' : 'Kop rudę miedzi'}
-        </button>
-        <p style={{ fontFamily: 'Crimson Text', fontSize: '12px', color: '#1e2840', fontStyle: 'italic', textAlign: 'center', margin: 0 }}>
-          k20 · 1–5 nic · 6–15 ×1 · 16–19 ×2 · 20 ×3
-        </p>
+        {status === 'done' ? (
+          <button className="btn-primary" onClick={handleCollect}
+            style={{ background: 'linear-gradient(135deg, #1a3060, #2a50a0)', borderColor: '#4080d0' }}>
+            Zbierz i wróć
+          </button>
+        ) : (
+          <button className="btn-primary" onClick={handleSend} disabled={status === 'running'}
+            style={{ background: status === 'idle' ? 'linear-gradient(135deg, #1a3060, #2a50a0)' : undefined, borderColor: status === 'idle' ? '#4080d0' : undefined }}>
+            {status === 'running' ? 'Górnik w drodze...' : 'Wyślij górnika'}
+          </button>
+        )}
       </div>
     </div>
   )

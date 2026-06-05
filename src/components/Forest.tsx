@@ -1,18 +1,17 @@
 import { useState, useEffect } from 'react'
-import type { Inventory, DiceResult } from '../types'
-import DiceRoll from './DiceRoll'
+import type { Inventory } from '../types'
 import { startForestAmbience, stopForestAmbience, playChopping } from '../sounds'
 
-function rollForest(): DiceResult {
-  const roll = Math.floor(Math.random() * 20) + 1
-  let loot: DiceResult['loot'] = null
-  if (roll >= 16 && roll <= 19) loot = { item: 'wood', amount: 2 }
-  else if (roll === 20) loot = { item: 'wood', amount: 3 }
-  else if (roll >= 6) loot = { item: 'wood', amount: 1 }
-  return { roll, loot }
+const EXPEDITION_MS = 5000
+
+function rollLoot(): { item: keyof Inventory; amount: number } | null {
+  const r = Math.random()
+  if (r < 0.25) return null
+  if (r < 0.75) return { item: 'wood', amount: 1 }
+  if (r < 0.95) return { item: 'wood', amount: 2 }
+  return { item: 'wood', amount: 3 }
 }
 
-// Pyłki leśne
 const FOREST_PARTICLES = [
   { left: '18%', top: '38%', delay: '0s',   dur: '4s'  },
   { left: '32%', top: '22%', delay: '1.2s', dur: '3.5s'},
@@ -24,7 +23,6 @@ const FOREST_PARTICLES = [
   { left: '60%', top: '18%', delay: '0.9s', dur: '4.8s'},
 ]
 
-// Świetliki
 const FIREFLIES = [
   { left: '15%', top: '60%', delay: '0s',   col: 'rgba(120,255,180,0.9)' },
   { left: '75%', top: '42%', delay: '1.4s', col: 'rgba(100,220,255,0.9)' },
@@ -40,48 +38,64 @@ interface Props {
 }
 
 export default function Forest({ inventory, onUpdate, onBack }: Props) {
-  const [result, setResult] = useState<DiceResult | null>(null)
-  const [rolling, setRolling] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'running' | 'done'>('idle')
+  const [progress, setProgress] = useState(0)
+  const [loot, setLoot] = useState<{ item: keyof Inventory; amount: number } | null>(null)
 
   useEffect(() => {
     startForestAmbience()
     return () => stopForestAmbience()
   }, [])
 
-  function handleGather() {
-    if (rolling) return
-    playChopping()
-    setRolling(true)
-    setResult(rollForest())
+  useEffect(() => {
+    if (status !== 'running') return
+    const start = Date.now()
+    const tick = setInterval(() => {
+      const pct = Math.min((Date.now() - start) / EXPEDITION_MS * 100, 100)
+      setProgress(pct)
+      if (pct >= 100) {
+        clearInterval(tick)
+        const result = rollLoot()
+        setLoot(result)
+        setStatus('done')
+        playChopping()
+      }
+    }, 50)
+    return () => clearInterval(tick)
+  }, [status])
+
+  function handleSend() {
+    setStatus('running')
+    setProgress(0)
   }
 
-  function handleDone() {
-    if (result?.loot) {
-      onUpdate({ ...inventory, wood: inventory.wood + result.loot.amount })
-    }
-    setRolling(false)
+  function handleCollect() {
+    if (loot) onUpdate({ ...inventory, wood: inventory.wood + loot.amount })
+    setLoot(null)
+    setStatus('idle')
+    setProgress(0)
   }
+
+  const secondsLeft = status === 'running'
+    ? Math.max(0, Math.ceil((EXPEDITION_MS - progress / 100 * EXPEDITION_MS) / 1000))
+    : 0
 
   return (
     <div className="screen-enter" style={{ position: 'relative', width: '100%', height: '100dvh', overflow: 'hidden' }}>
 
-      {/* Tło */}
       <img src="/assets/backgrounds/forest.webp" alt="" draggable={false}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', pointerEvents: 'none', userSelect: 'none' }} />
 
-      {/* Kryształy niebieskie lewo */}
       <div style={{ position: 'absolute', left: '14%', top: '52%', width: '18%', height: '10%',
         borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(80,160,255,0.7) 0%, transparent 70%)',
         filter: 'blur(8px)', pointerEvents: 'none', mixBlendMode: 'screen',
         animation: 'ambiMine 2.8s ease-in-out infinite' }} />
 
-      {/* Światło korony drzew */}
       <div style={{ position: 'absolute', left: '30%', top: '0%', width: '40%', height: '30%',
         background: 'radial-gradient(ellipse at 50% 0%, rgba(120,200,100,0.18) 0%, transparent 70%)',
         filter: 'blur(12px)', pointerEvents: 'none', mixBlendMode: 'screen',
         animation: 'ambiForest 5s ease-in-out infinite' }} />
 
-      {/* Pyłki magiczne */}
       {FOREST_PARTICLES.map((p, i) => (
         <div key={i} style={{
           position: 'absolute', left: p.left, top: p.top,
@@ -94,7 +108,6 @@ export default function Forest({ inventory, onUpdate, onBack }: Props) {
         }} />
       ))}
 
-      {/* Świetliki */}
       {FIREFLIES.map((f, i) => (
         <div key={i} style={{
           position: 'absolute', left: f.left, top: f.top,
@@ -106,7 +119,6 @@ export default function Forest({ inventory, onUpdate, onBack }: Props) {
         }} />
       ))}
 
-      {/* Ciemny gradient góra (header) */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '100px',
         background: 'linear-gradient(180deg, rgba(2,8,4,0.82) 0%, transparent 100%)', pointerEvents: 'none' }} />
 
@@ -120,36 +132,77 @@ export default function Forest({ inventory, onUpdate, onBack }: Props) {
           </div>
           <p style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#7a9060', margin: '2px 0 0', fontStyle: 'italic' }}>Magiczny las goblinów</p>
         </div>
-        {/* Wood counter */}
         <div style={{ marginLeft: 'auto', background: 'rgba(10,20,8,0.75)', border: '1px solid rgba(100,180,60,0.4)', borderRadius: '10px', padding: '6px 12px', backdropFilter: 'blur(6px)' }}>
           <span style={{ fontFamily: 'Cinzel', fontSize: '11px', color: '#8ab060', letterSpacing: '0.05em' }}>🪵</span>
           <span style={{ fontFamily: 'Cinzel', fontSize: '16px', fontWeight: 700, color: '#a0d060', marginLeft: 6 }}>{inventory.wood}</span>
         </div>
       </div>
 
-      {/* Panel akcji – dół */}
+      {/* Panel akcji */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
         background: 'linear-gradient(0deg, rgba(2,8,4,0.97) 0%, rgba(4,12,6,0.92) 60%, transparent 100%)',
         padding: '0 16px 32px' }}>
 
-        {/* Dice area */}
-        <div style={{ minHeight: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 0 8px' }}>
-          {result ? (
-            <DiceRoll result={result} onDone={handleDone} />
-          ) : (
+        {/* Obszar wyniku / paska */}
+        <div style={{ minHeight: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px 0 12px', gap: 12 }}>
+
+          {status === 'idle' && (
             <p style={{ fontFamily: 'Crimson Text', fontSize: '16px', color: '#3a5028', fontStyle: 'italic', margin: 0 }}>
-              Naciśnij przycisk i rzuć kośćmi fortuny...
+              Wyślij drwala na wyprawę po drewno...
             </p>
+          )}
+
+          {status === 'running' && (
+            <>
+              <p style={{ fontFamily: 'Crimson Text', fontSize: '15px', color: '#6a8a50', fontStyle: 'italic', margin: 0 }}>
+                Drwal w lesie... {secondsLeft}s
+              </p>
+              <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.07)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: '4px',
+                  background: 'linear-gradient(90deg, #2a6010, #70c030)',
+                  width: `${progress}%`,
+                  transition: 'width 0.05s linear',
+                  boxShadow: '0 0 8px rgba(80,200,40,0.5)',
+                }} />
+              </div>
+            </>
+          )}
+
+          {status === 'done' && (
+            loot ? (
+              <div className="loot-pop" style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                background: 'rgba(40,100,20,0.25)', border: '1px solid rgba(80,180,40,0.35)',
+                borderRadius: '12px', padding: '14px 24px', width: '100%',
+              }}>
+                <span style={{ fontFamily: 'Cinzel', fontWeight: 700, fontSize: '26px', color: '#80d040' }}>+{loot.amount}</span>
+                <span style={{ fontSize: '22px' }}>🪵</span>
+                <span style={{ fontFamily: 'Crimson Text', fontSize: '17px', color: '#a0c070' }}>Drewno</span>
+              </div>
+            ) : (
+              <div style={{
+                fontFamily: 'Cinzel', fontSize: '14px', color: '#4a5a38',
+                background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(60,80,40,0.3)',
+                borderRadius: '12px', padding: '14px 24px', width: '100%', textAlign: 'center',
+              }}>
+                Drwal wrócił z pustymi rękami
+              </div>
+            )
           )}
         </div>
 
-        <button className="btn-primary" onClick={handleGather} disabled={rolling}
-          style={{ marginBottom: '8px', background: rolling ? undefined : 'linear-gradient(135deg, #2a6010, #4a9020)', borderColor: rolling ? undefined : '#70c030' }}>
-          {rolling ? 'Szukasz...' : 'Zbieraj drewno'}
-        </button>
-        <p style={{ fontFamily: 'Crimson Text', fontSize: '12px', color: '#2a4018', fontStyle: 'italic', textAlign: 'center', margin: 0 }}>
-          k20 · 1–5 nic · 6–15 ×1 · 16–19 ×2 · 20 ×3
-        </p>
+        {status === 'done' ? (
+          <button className="btn-primary" onClick={handleCollect}
+            style={{ background: 'linear-gradient(135deg, #2a6010, #4a9020)', borderColor: '#70c030' }}>
+            Zbierz i wróć
+          </button>
+        ) : (
+          <button className="btn-primary" onClick={handleSend} disabled={status === 'running'}
+            style={{ background: status === 'idle' ? 'linear-gradient(135deg, #2a6010, #4a9020)' : undefined, borderColor: status === 'idle' ? '#70c030' : undefined }}>
+            {status === 'running' ? 'Drwal w drodze...' : 'Wyślij drwala'}
+          </button>
+        )}
       </div>
     </div>
   )

@@ -53,7 +53,8 @@ export default function App() {
         <Forge
           inventory={state.inventory}
           professions={state.professions}
-          onUpdate={(inv, profs) => setState(s => ({ ...s, inventory: inv, professions: profs }))}
+          ownedItems={state.ownedItems}
+          onUpdate={(inv, profs, items) => setState(s => ({ ...s, inventory: inv, professions: profs, ownedItems: items ?? s.ownedItems }))}
           onBack={() => setScreen('settlement')}
         />
       )}
@@ -72,6 +73,7 @@ export default function App() {
         <CharacterScreen
           equip={state.equip}
           tools={state.tools}
+          ownedItems={state.ownedItems}
           onUpdate={(equip, tools) => setState(s => ({ ...s, equip, tools }))}
           onBack={() => setScreen('settlement')}
         />

@@ -105,8 +105,9 @@ export function loadState(): GameState {
     const inventory = { ...DEFAULT_INVENTORY, ...(parsed.inventory ?? {}) }
     const equip = { ...DEFAULT_EQUIP, ...(parsed.equip ?? {}) }
     const tools = { ...DEFAULT_TOOLS, ...(parsed.tools ?? {}) }
+    const ownedItems = parsed.ownedItems ?? []
     const { xp, level } = calcCharacterLevel(professions)
-    return { inventory, professions, characterXp: xp, characterLevel: level, equip, tools }
+    return { inventory, professions, characterXp: xp, characterLevel: level, equip, tools, ownedItems }
   } catch {
     return makeDefault()
   }
@@ -118,6 +119,7 @@ export function saveState(state: GameState): void {
     professions: state.professions,
     equip: state.equip,
     tools: state.tools,
+    ownedItems: state.ownedItems,
   }))
 }
 
@@ -130,6 +132,7 @@ export function makeDefault(): GameState {
     characterLevel: 1,
     equip: { ...DEFAULT_EQUIP },
     tools: { ...DEFAULT_TOOLS },
+    ownedItems: [],
   }
 }
 

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import type { Inventory, Professions } from '../types'
+import type { Inventory, Professions, ItemId } from '../types'
 import { playSmithing, startForgeAmbience, stopForgeAmbience } from '../sounds'
 import { addProfessionXp, xpProgress, xpToNextLevel, xpForLevel } from '../store'
 
@@ -17,11 +17,12 @@ const EMBERS = [
 interface Props {
   inventory: Inventory
   professions: Professions
-  onUpdate: (inv: Inventory, profs: Professions) => void
+  ownedItems: ItemId[]
+  onUpdate: (inv: Inventory, profs: Professions, items?: ItemId[]) => void
   onBack: () => void
 }
 
-export default function Forge({ inventory, professions, onUpdate, onBack }: Props) {
+export default function Forge({ inventory, professions, ownedItems, onUpdate, onBack }: Props) {
   useEffect(() => {
     startForgeAmbience()
     return () => stopForgeAmbience()
@@ -33,6 +34,8 @@ export default function Forge({ inventory, professions, onUpdate, onBack }: Prop
 
   const canLight = inventory.wood >= 1
   const canSmelt = inventory.forgeEmber >= 1 && inventory.copperOre >= 2
+  const canCraftSword = inventory.copperBar >= 1 && inventory.wood >= 1
+  const hasSword = ownedItems.includes('sword_copper')
 
   function handleLight() {
     if (!canLight) return
@@ -51,6 +54,17 @@ export default function Forge({ inventory, professions, onUpdate, onBack }: Prop
       copperOre: inventory.copperOre - 2,
       copperBar: inventory.copperBar + 1,
     }, newProfs)
+  }
+
+  function handleCraftSword() {
+    if (!canCraftSword || hasSword) return
+    playSmithing()
+    const newProfs = addProfessionXp(professions, 'blacksmith', 50)
+    onUpdate(
+      { ...inventory, copperBar: inventory.copperBar - 1, wood: inventory.wood - 1 },
+      newProfs,
+      [...ownedItems, 'sword_copper'],
+    )
   }
 
   return (
@@ -162,12 +176,23 @@ export default function Forge({ inventory, professions, onUpdate, onBack }: Prop
         </div>
 
         {/* Akcja 2 */}
-        <div>
+        <div style={{ marginBottom: '10px' }}>
           <p style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#506030', margin: '0 0 6px', fontStyle: 'italic', textAlign: 'center' }}>
             🔥 Żar ×1 + 🪨 Ruda ×2 → 🔶 Sztabka ×1
           </p>
           <button className="btn-secondary" onClick={handleSmelt} disabled={!canSmelt}>
             {canSmelt ? '🔥 Przetop rudę miedzi' : 'Niewystarczające zasoby'}
+          </button>
+        </div>
+
+        {/* Akcja 3 – Miecz miedziany */}
+        <div style={{ borderTop: '1px solid rgba(200,140,40,0.15)', paddingTop: '10px' }}>
+          <p style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#806030', margin: '0 0 6px', fontStyle: 'italic', textAlign: 'center' }}>
+            🔶 Sztabka ×1 + 🪵 Drewno ×1 → ⚔️ Miecz miedziany
+          </p>
+          <button className="btn-primary" onClick={handleCraftSword} disabled={!canCraftSword || hasSword}
+            style={{ background: canCraftSword && !hasSword ? 'linear-gradient(135deg, #6a3010, #b05020)' : undefined, borderColor: canCraftSword && !hasSword ? '#d07030' : undefined }}>
+            {hasSword ? 'Już posiadasz miecz' : canCraftSword ? '⚔️ Wykuj miecz miedziany' : 'Potrzebujesz sztabki i drewna'}
           </button>
         </div>
       </div>

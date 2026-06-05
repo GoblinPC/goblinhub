@@ -24,6 +24,7 @@ export interface GameState {
   characterLevel: number
   equip: EquipSlots
   tools: ToolSlots
+  ownedItems: ItemId[]
 }
 
 export type Screen = 'settlement' | 'forest' | 'mine' | 'forge' | 'inventory' | 'character' | 'stats'

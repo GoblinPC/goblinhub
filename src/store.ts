@@ -3,6 +3,7 @@ import type { Inventory, Professions, ProfessionKey, ProfessionStats, GameState,
 // ─── Defaults ─────────────────────────────────────────────────────────────────
 
 const DEFAULT_INVENTORY: Inventory = {
+  gold: 0,
   wood: 0,
   copperOre: 0,
   copperBar: 0,
@@ -102,7 +103,10 @@ export function loadState(): GameState {
     for (const k of PROFESSION_KEYS) {
       if (parsed.professions?.[k]) professions[k] = { ...defaultProf(), ...parsed.professions[k] }
     }
-    const inventory = { ...DEFAULT_INVENTORY, ...(parsed.inventory ?? {}) }
+    const rawInv = { ...DEFAULT_INVENTORY, ...(parsed.inventory ?? {}) }
+    const inventory = Object.fromEntries(
+      Object.keys(DEFAULT_INVENTORY).map(k => [k, Number(rawInv[k as keyof Inventory]) || 0])
+    ) as unknown as Inventory
     const equip = { ...DEFAULT_EQUIP, ...(parsed.equip ?? {}) }
     const tools = { ...DEFAULT_TOOLS, ...(parsed.tools ?? {}) }
     const ownedItems = parsed.ownedItems ?? []

@@ -1,4 +1,5 @@
 export interface Inventory {
+  gold: number
   wood: number
   copperOre: number
   copperBar: number
@@ -27,11 +28,11 @@ export interface GameState {
   ownedItems: ItemId[]
 }
 
-export type Screen = 'settlement' | 'forest' | 'mine' | 'forge' | 'inventory' | 'character' | 'stats'
+export type Screen = 'settlement' | 'forest' | 'mine' | 'forge' | 'inventory' | 'character' | 'stats' | 'expeditions'
 
 // ─── Items ────────────────────────────────────────────────────────────────────
 
-export type ItemId = 'sword_copper'
+export type ItemId = 'sword_copper' | 'club_wooden'
 
 export interface EquipSlots {
   helmet:      ItemId | null

@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import type { Screen, Inventory } from '../types'
 import { startHubMusic, stopHubMusic, playHoverPreview, stopHoverPreview } from '../sounds'
 
-type HoveredBuilding = 'forge' | 'forest' | 'mine' | null
+type HoveredBuilding = 'forge' | 'forest' | 'mine' | 'expeditions' | null
 
 // ─── HOTSPOT CONFIG ───────────────────────────────────────────────────────────
 // Wszystkie pozycje w % względem kontenera 9:16.
@@ -34,6 +34,15 @@ const HOTSPOTS = {
     label: 'Kopalnia',
     glowColor: 'rgba(60, 120, 240, 0.3)',
     borderColor: 'rgba(80, 160, 255, 0.6)',
+  },
+  expeditions: {
+    top: '53%',
+    right: '0%',
+    width: '58%',
+    height: '31%',
+    label: 'Wyprawy',
+    glowColor: 'rgba(200, 50, 30, 0.3)',
+    borderColor: 'rgba(220, 80, 50, 0.6)',
   },
 } as const
 
@@ -106,7 +115,7 @@ export default function Settlement({ onNavigate }: Props) {
     if (hoverRef.current === id) return
     hoverRef.current = id
     setHovered(id)
-    playHoverPreview(id)
+    if (id !== 'expeditions') playHoverPreview(id)
   }
 
   function onLeave() {
@@ -286,6 +295,26 @@ export default function Settlement({ onNavigate }: Props) {
         config={HOTSPOTS.mine}
         onClick={() => { onLeave(); onNavigate('mine') }}
         onEnter={() => onEnter('mine')}
+        onLeave={onLeave}
+      />
+
+      {/* ── Hover burst: Wyprawy – krwawy blask ──────────────────── */}
+      <div style={{
+        position: 'absolute', right: '0%', top: '50%', width: '60%', height: '34%',
+        borderRadius: '40%',
+        background: 'radial-gradient(ellipse, rgba(220,50,20,0.7) 0%, rgba(180,30,10,0.35) 50%, transparent 70%)',
+        filter: 'blur(14px)', pointerEvents: 'none', mixBlendMode: 'screen',
+        opacity: hovered === 'expeditions' ? 1 : 0,
+        transform: hovered === 'expeditions' ? 'scale(1.05)' : 'scale(0.85)',
+        transition: 'opacity 0.25s ease, transform 0.25s ease',
+      }} />
+
+      {/* ── Hotspot: Wyprawy ─────────────────────────────────────── */}
+      <HotspotButton
+        label="Wyprawy"
+        config={HOTSPOTS.expeditions}
+        onClick={() => { onLeave(); onNavigate('expeditions') }}
+        onEnter={() => onEnter('expeditions')}
         onLeave={onLeave}
       />
 

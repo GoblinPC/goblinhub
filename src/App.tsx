@@ -8,6 +8,7 @@ import Forge from './components/Forge'
 import InventoryScreen from './components/InventoryScreen'
 import CharacterScreen from './components/CharacterScreen'
 import StatsScreen from './components/StatsScreen'
+import Expeditions from './components/Expeditions'
 import DevPanel from './components/DevPanel'
 
 export default function App() {
@@ -59,7 +60,13 @@ export default function App() {
         />
       )}
       {screen === 'inventory' && (
-        <InventoryScreen inventory={state.inventory} onBack={() => setScreen('settlement')} />
+        <InventoryScreen
+          inventory={state.inventory}
+          ownedItems={state.ownedItems}
+          equip={state.equip}
+          onEquipUpdate={equip => setState(s => ({ ...s, equip }))}
+          onBack={() => setScreen('settlement')}
+        />
       )}
       {screen === 'stats' && (
         <StatsScreen
@@ -75,6 +82,17 @@ export default function App() {
           tools={state.tools}
           ownedItems={state.ownedItems}
           onUpdate={(equip, tools) => setState(s => ({ ...s, equip, tools }))}
+          onBack={() => setScreen('settlement')}
+        />
+      )}
+      {screen === 'expeditions' && (
+        <Expeditions
+          characterLevel={state.characterLevel}
+          professions={state.professions}
+          equip={state.equip}
+          inventory={state.inventory}
+          ownedItems={state.ownedItems}
+          onUpdate={(profs, inv, items) => setState(s => ({ ...s, professions: profs, inventory: inv, ownedItems: items }))}
           onBack={() => setScreen('settlement')}
         />
       )}

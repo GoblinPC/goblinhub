@@ -1,6 +1,7 @@
 import type { Inventory } from '../types'
 
 export const ITEM_LABELS: Record<keyof Inventory, string> = {
+  gold: 'Złoto',
   wood: 'Drewno',
   copperOre: 'Ruda miedzi',
   copperBar: 'Sztabka miedzi',
@@ -10,6 +11,7 @@ export const ITEM_LABELS: Record<keyof Inventory, string> = {
 }
 
 export const ITEM_COLORS: Record<keyof Inventory, string> = {
+  gold: '#e0b030',
   wood: '#a07840',
   copperOre: '#c07850',
   copperBar: '#e09050',
@@ -19,6 +21,7 @@ export const ITEM_COLORS: Record<keyof Inventory, string> = {
 }
 
 export const ITEM_ICONS: Record<keyof Inventory, string> = {
+  gold: '💰',
   wood: '🪵',
   copperOre: '🪨',
   copperBar: '🔶',

@@ -93,8 +93,7 @@ interface Props {
   onNavigate: (screen: Screen) => void
 }
 
-export default function Settlement({ inventory, onNavigate }: Props) {
-  const total = Object.values(inventory).reduce((a, b) => a + b, 0)
+export default function Settlement({ onNavigate }: Props) {
   const [hovered, setHovered] = useState<HoveredBuilding>(null)
   const hoverRef = useRef<HoveredBuilding>(null)
 
@@ -308,13 +307,24 @@ export default function Settlement({ inventory, onNavigate }: Props) {
 
       {/* ── Gradient dół ─────────────────────────────────────────── */}
       <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, height: '120px',
-        background: 'linear-gradient(0deg, rgba(5,3,2,0.8) 0%, transparent 100%)',
+        position: 'absolute', bottom: 0, left: 0, right: 0, height: '140px',
+        background: 'linear-gradient(0deg, rgba(5,3,2,0.95) 0%, rgba(5,3,2,0.6) 60%, transparent 100%)',
         pointerEvents: 'none',
       }} />
 
-      {/* ── Plecak – prawy górny róg ──────────────────────────────── */}
-      <BackpackButton total={total} onClick={() => onNavigate('inventory')} />
+      {/* ── Dolny pasek nawigacji ─────────────────────────────────── */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        display: 'flex', justifyContent: 'space-around', alignItems: 'center',
+        padding: '10px 16px 20px',
+        zIndex: 15,
+      }}>
+        <NavBtn icon="🎒" label="Plecak"   onClick={() => onNavigate('inventory')} />
+        <NavBtn icon="⚔️" label="Postać"   onClick={() => onNavigate('character')} />
+        <NavBtn icon="📊" label="Statystyki" onClick={() => onNavigate('stats')} />
+      </div>
+
+      {/* ── Plecak – prawy górny róg (usunięty, teraz w dolnym pasku) */}
     </div>
   )
 }
@@ -397,93 +407,26 @@ function HotspotButton({ label, config, onClick, onEnter, onLeave }: HotspotProp
   )
 }
 
-// ─── Backpack Button ──────────────────────────────────────────────────────────
+// ─── Nav Button ───────────────────────────────────────────────────────────────
 
-function BackpackButton({ total, onClick }: { total: number; onClick: () => void }) {
-  const [hover, setHover] = useState(false)
-
+function NavBtn({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      onPointerEnter={() => setHover(true)}
-      onPointerLeave={() => setHover(false)}
-      onPointerDown={() => setHover(true)}
-      aria-label="Ekwipunek"
       style={{
-        position: 'absolute',
-        top: '12px',
-        right: '16px',
-        background: 'none',
-        border: 'none',
-        padding: 0,
-        cursor: 'pointer',
-        touchAction: 'manipulation',
-        zIndex: 10,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '4px',
+        background: 'rgba(10,8,5,0.75)',
+        border: '1px solid rgba(180,130,60,0.35)',
+        borderRadius: '14px',
+        padding: '8px 16px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+        cursor: 'pointer', touchAction: 'manipulation',
+        backdropFilter: 'blur(8px)',
+        flex: 1, margin: '0 5px',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
       }}
     >
-      {/* Glow pod ikoną */}
-      <div style={{
-        position: 'absolute',
-        bottom: '-8px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: '90px',
-        height: '22px',
-        borderRadius: '50%',
-        background: 'radial-gradient(ellipse, rgba(200,140,50,0.6) 0%, transparent 70%)',
-        filter: 'blur(6px)',
-        opacity: hover ? 1 : 0.5,
-        transition: 'opacity 0.2s ease',
-        pointerEvents: 'none',
-        animation: 'backpackGlow 2.5s ease-in-out infinite',
-      }} />
-
-      {/* Ikona plecaka */}
-      <img
-        src="/assets/backgrounds/backpack_icon.png"
-        alt="Ekwipunek"
-        draggable={false}
-        style={{
-          width: '100px',
-          height: '100px',
-          objectFit: 'contain',
-          filter: hover
-            ? 'drop-shadow(0 0 14px rgba(220,160,60,0.95)) drop-shadow(0 0 28px rgba(200,120,30,0.7)) drop-shadow(0 6px 16px rgba(0,0,0,0.85)) brightness(1.15)'
-            : 'drop-shadow(0 0 8px rgba(180,120,40,0.6)) drop-shadow(0 4px 14px rgba(0,0,0,0.85)) drop-shadow(0 8px 24px rgba(0,0,0,0.7))',
-          transform: hover ? 'scale(1.12) translateY(-3px)' : 'scale(1)',
-          transition: 'filter 0.2s ease, transform 0.2s ease',
-          animation: 'backpackFloat 3.5s ease-in-out infinite',
-        }}
-      />
-
-      {/* Badge z liczbą itemów */}
-      {total > 0 && (
-        <div style={{
-          position: 'absolute',
-          top: '-4px',
-          right: '-6px',
-          background: 'linear-gradient(135deg, #c45a10, #e8720a)',
-          border: '2px solid #f09030',
-          borderRadius: '50%',
-          width: '22px',
-          height: '22px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontFamily: 'Cinzel',
-          fontSize: '11px',
-          fontWeight: 700,
-          color: '#fff8f0',
-          boxShadow: '0 2px 6px rgba(200,80,10,0.5)',
-          pointerEvents: 'none',
-        }}>
-          {total}
-        </div>
-      )}
+      <span style={{ fontSize: '22px', lineHeight: 1 }}>{icon}</span>
+      <span style={{ fontFamily: 'Cinzel', fontSize: '10px', color: '#c0a060', letterSpacing: '0.05em', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>{label}</span>
     </button>
   )
 }

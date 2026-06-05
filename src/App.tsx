@@ -7,6 +7,7 @@ import Mine from './components/Mine'
 import Forge from './components/Forge'
 import InventoryScreen from './components/InventoryScreen'
 import CharacterScreen from './components/CharacterScreen'
+import StatsScreen from './components/StatsScreen'
 import DevPanel from './components/DevPanel'
 
 export default function App() {
@@ -58,6 +59,14 @@ export default function App() {
       )}
       {screen === 'inventory' && (
         <InventoryScreen inventory={state.inventory} onBack={() => setScreen('settlement')} />
+      )}
+      {screen === 'stats' && (
+        <StatsScreen
+          professions={state.professions}
+          characterXp={state.characterXp}
+          characterLevel={state.characterLevel}
+          onBack={() => setScreen('settlement')}
+        />
       )}
       {screen === 'character' && (
         <CharacterScreen

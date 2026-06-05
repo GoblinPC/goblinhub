@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { Inventory, Professions } from '../types'
 import { startForestAmbience, stopForestAmbience, playChopping, } from '../sounds'
-import { addProfessionXp, expeditionMs, xpProgress, xpToNextLevel } from '../store'
+import { addProfessionXp, expeditionMs, xpProgress, xpToNextLevel, xpForLevel } from '../store'
 
 function rollLoot(): { item: keyof Inventory; amount: number } | null {
   const r = Math.random()
@@ -138,19 +138,19 @@ export default function Forest({ inventory, professions, onUpdate, onBack }: Pro
             <span style={{ fontSize: '22px' }}>🌲</span>
             <h2 style={{ fontFamily: 'Cinzel', fontSize: '20px', fontWeight: 700, color: '#c8f0a0', margin: 0, textShadow: '0 0 16px rgba(80,200,80,0.6)' }}>Las</h2>
           </div>
-          <p style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#7a9060', margin: '2px 0 0', fontStyle: 'italic' }}>Magiczny las goblinów</p>
+          <p style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#b0d890', margin: '2px 0 0', fontStyle: 'italic', textShadow: '0 1px 6px rgba(0,0,0,0.95)' }}>Magiczny las goblinów</p>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-          <div style={{ background: 'rgba(10,20,8,0.75)', border: '1px solid rgba(100,180,60,0.4)', borderRadius: '10px', padding: '4px 10px', backdropFilter: 'blur(6px)' }}>
+          <div style={{ background: 'rgba(10,20,8,0.85)', border: '1px solid rgba(100,180,60,0.5)', borderRadius: '10px', padding: '4px 10px', backdropFilter: 'blur(8px)' }}>
             <span style={{ fontFamily: 'Cinzel', fontSize: '11px', color: '#8ab060' }}>🪵</span>
             <span style={{ fontFamily: 'Cinzel', fontSize: '15px', fontWeight: 700, color: '#a0d060', marginLeft: 5 }}>{inventory.wood}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontFamily: 'Cinzel', fontSize: '10px', color: '#5a7040' }}>🪓 lv.{prof.level}</span>
-            <div style={{ width: 60, height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.55)', borderRadius: 6, padding: '2px 6px', backdropFilter: 'blur(4px)' }}>
+            <span style={{ fontFamily: 'Cinzel', fontSize: '10px', color: '#90c060', textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>🪓 lv.{prof.level}</span>
+            <div style={{ width: 55, height: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 2, overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${xpPct}%`, background: 'linear-gradient(90deg,#3a7010,#80c030)', borderRadius: 2, boxShadow: '0 0 4px rgba(80,200,30,0.5)', transition: 'width 0.3s' }} />
             </div>
-            <span style={{ fontFamily: 'Cinzel', fontSize: '9px', color: '#3a5020' }}>{prof.xp % xpNeeded}/{xpNeeded}</span>
+            <span style={{ fontFamily: 'Cinzel', fontSize: '9px', color: '#80a860' }}>{prof.xp - xpForLevel(prof.level)}/{xpNeeded}</span>
           </div>
         </div>
       </div>

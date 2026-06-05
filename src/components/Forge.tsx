@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import type { Inventory, Professions } from '../types'
 import { playSmithing, startForgeAmbience, stopForgeAmbience } from '../sounds'
-import { addProfessionXp, xpProgress, xpToNextLevel } from '../store'
+import { addProfessionXp, xpProgress, xpToNextLevel, xpForLevel } from '../store'
 
 // Iskry lecące w górę z paleniska
 const EMBERS = [
@@ -125,15 +125,15 @@ export default function Forge({ inventory, professions, onUpdate, onBack }: Prop
             <span style={{ fontSize: '22px' }}>⚒️</span>
             <h2 style={{ fontFamily: 'Cinzel', fontSize: '20px', fontWeight: 700, color: '#f0c060', margin: 0, textShadow: '0 0 16px rgba(240,140,20,0.6)' }}>Kuźnia</h2>
           </div>
-          <p style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#7a5030', margin: '2px 0 0', fontStyle: 'italic' }}>Gorące palenisko goblinich kowali</p>
+          <p style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#d0a070', margin: '2px 0 0', fontStyle: 'italic', textShadow: '0 1px 6px rgba(0,0,0,0.95)' }}>Gorące palenisko goblinich kowali</p>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-          <span style={{ fontFamily: 'Cinzel', fontSize: '10px', color: '#7a5030' }}>🔨 Kowal lv.{prof.level}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 70, height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.55)', borderRadius: 6, padding: '2px 6px', backdropFilter: 'blur(4px)' }}>
+            <span style={{ fontFamily: 'Cinzel', fontSize: '10px', color: '#d09050', textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>🔨 lv.{prof.level}</span>
+            <div style={{ width: 55, height: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 2, overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${xpPct}%`, background: 'linear-gradient(90deg,#8a4010,#e08030)', borderRadius: 2, boxShadow: '0 0 4px rgba(220,120,30,0.5)', transition: 'width 0.3s' }} />
             </div>
-            <span style={{ fontFamily: 'Cinzel', fontSize: '9px', color: '#5a3820' }}>{prof.xp % xpNeeded}/{xpNeeded}</span>
+            <span style={{ fontFamily: 'Cinzel', fontSize: '9px', color: '#b07040' }}>{prof.xp - xpForLevel(prof.level)}/{xpNeeded}</span>
           </div>
         </div>
       </div>

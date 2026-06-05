@@ -12,12 +12,12 @@ const DEFAULT_INVENTORY: Inventory = {
 }
 
 const DEFAULT_EQUIP: EquipSlots = {
-  weapon: null, helmet: null, armor: null, shield: null,
-  gloves: null, ring: null, boots: null, cloak: null, amulet: null,
+  helmet: null, shoulders: null, armor: null, weapon: null,
+  shield: null, cloak: null, accessories: null, amulet: null, boots: null,
 }
 
 const DEFAULT_TOOLS: ToolSlots = {
-  axe: null, pickaxe: null, fishingRod: null, shovel: null, hammer: null,
+  axe: null, pickaxe: null, fishingRod: null, shovel: null, hammer: null, misc: null,
 }
 
 const PROFESSION_KEYS: ProfessionKey[] = ['woodcutter', 'miner', 'blacksmith', 'herbalist', 'fisher', 'warrior']

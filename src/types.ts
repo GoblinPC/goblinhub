@@ -34,15 +34,15 @@ export type Screen = 'settlement' | 'forest' | 'mine' | 'forge' | 'inventory' | 
 export type ItemId = 'sword_copper'
 
 export interface EquipSlots {
-  weapon:  ItemId | null
-  helmet:  ItemId | null
-  armor:   ItemId | null
-  shield:  ItemId | null
-  gloves:  ItemId | null
-  ring:    ItemId | null
-  boots:   ItemId | null
-  cloak:   ItemId | null
-  amulet:  ItemId | null
+  helmet:      ItemId | null
+  shoulders:   ItemId | null
+  armor:       ItemId | null
+  weapon:      ItemId | null
+  shield:      ItemId | null
+  cloak:       ItemId | null
+  accessories: ItemId | null
+  amulet:      ItemId | null
+  boots:       ItemId | null
 }
 
 export interface ToolSlots {
@@ -51,4 +51,5 @@ export interface ToolSlots {
   fishingRod: ItemId | null
   shovel:     ItemId | null
   hammer:     ItemId | null
+  misc:       ItemId | null
 }

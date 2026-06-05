@@ -29,11 +29,12 @@ export default function App() {
     <div
       style={{
         minHeight: '100dvh',
+        width: '100%',
+        maxWidth: '480px',
+        margin: '0 auto',
         background: 'radial-gradient(ellipse at 50% 0%, #2a1a08 0%, #0e0b08 60%)',
         overflowX: 'hidden',
         overflowY: 'auto',
-        maxWidth: '480px',
-        margin: '0 auto',
         position: 'relative',
       }}
     >

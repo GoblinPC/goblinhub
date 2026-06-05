@@ -1,5 +1,17 @@
+import { useEffect } from 'react'
 import type { Inventory } from '../types'
-import ScreenHeader from './ScreenHeader'
+import { playSmithing, startForgeAmbience, stopForgeAmbience } from '../sounds'
+
+// Iskry lecące w górę z paleniska
+const EMBERS = [
+  { left: '18%', delay: '0s',   dur: '2.2s', size: 4 },
+  { left: '22%', delay: '0.4s', dur: '1.8s', size: 3 },
+  { left: '15%', delay: '0.8s', dur: '2.5s', size: 5 },
+  { left: '25%', delay: '1.3s', dur: '2s',   size: 3 },
+  { left: '20%', delay: '1.7s', dur: '2.3s', size: 4 },
+  { left: '12%', delay: '2.1s', dur: '1.9s', size: 3 },
+  { left: '28%', delay: '0.6s', dur: '2.6s', size: 4 },
+]
 
 interface Props {
   inventory: Inventory
@@ -8,16 +20,23 @@ interface Props {
 }
 
 export default function Forge({ inventory, onUpdate, onBack }: Props) {
+  useEffect(() => {
+    startForgeAmbience()
+    return () => stopForgeAmbience()
+  }, [])
+
   const canLight = inventory.wood >= 1
   const canSmelt = inventory.forgeEmber >= 1 && inventory.copperOre >= 2
 
   function handleLight() {
     if (!canLight) return
+    playSmithing()
     onUpdate({ ...inventory, wood: inventory.wood - 1, forgeEmber: inventory.forgeEmber + 1 })
   }
 
   function handleSmelt() {
     if (!canSmelt) return
+    playSmithing()
     onUpdate({
       ...inventory,
       forgeEmber: inventory.forgeEmber - 1,
@@ -27,84 +46,139 @@ export default function Forge({ inventory, onUpdate, onBack }: Props) {
   }
 
   return (
-    <div className="screen-enter flex flex-col" style={{ minHeight: '100%' }}>
-      <ScreenHeader icon="⚒️" title="Kuźnia" subtitle="Gorące palenisko goblinich kowali" onBack={onBack} />
+    <div className="screen-enter" style={{ position: 'relative', width: '100%', height: '100dvh', overflow: 'hidden' }}>
 
-      <div style={{ padding: '0 16px', flex: 1 }}>
-        {/* Ambient */}
-        <div style={{ textAlign: 'center', padding: '16px 0 8px', fontSize: '56px', lineHeight: 1, opacity: 0.85 }}>
-          🔥⚒️🔥
+      {/* Tło */}
+      <img src="/assets/backgrounds/forge.webp" alt="" draggable={false}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', pointerEvents: 'none', userSelect: 'none' }} />
+
+      {/* Wielki glow paleniska */}
+      <div style={{
+        position: 'absolute', left: '20%', top: '36%', width: '28%', height: '14%',
+        transform: 'translate(-50%, 0)',
+        borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(255,140,20,0.7) 0%, rgba(255,80,10,0.3) 50%, transparent 75%)',
+        filter: 'blur(10px)', pointerEvents: 'none', mixBlendMode: 'screen',
+        animation: 'ambiForge 1.8s ease-in-out infinite',
+      }} />
+
+      {/* Żarzące węgle – dolne palenisko */}
+      <div style={{
+        position: 'absolute', left: '20%', top: '50%', width: '20%', height: '7%',
+        transform: 'translate(-50%, 0)',
+        borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(255,80,10,0.6) 0%, transparent 70%)',
+        filter: 'blur(8px)', pointerEvents: 'none', mixBlendMode: 'screen',
+        animation: 'ambiForge 2.4s ease-in-out 0.3s infinite',
+      }} />
+
+      {/* Żyrandol */}
+      <div style={{
+        position: 'absolute', left: '58%', top: '8%', width: '16%', height: '7%',
+        transform: 'translate(-50%, 0)',
+        borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(255,200,80,0.5) 0%, transparent 70%)',
+        filter: 'blur(8px)', pointerEvents: 'none', mixBlendMode: 'screen',
+        animation: 'ambiLantern 2.5s ease-in-out 0.6s infinite',
+      }} />
+
+      {/* Latarnia przy drzwiach */}
+      <div style={{
+        position: 'absolute', left: '51%', top: '50%',
+        width: '10px', height: '10px', borderRadius: '50%',
+        transform: 'translate(-50%, -50%)',
+        background: 'rgba(255,200,100,0.9)', boxShadow: '0 0 14px 7px rgba(255,180,60,0.5)',
+        pointerEvents: 'none', mixBlendMode: 'screen',
+        animation: 'ambiLantern 1.6s ease-in-out 0.9s infinite',
+      }} />
+
+      {/* Iskry z paleniska */}
+      {EMBERS.map((e, i) => (
+        <div key={i} style={{
+          position: 'absolute', left: e.left, top: '48%',
+          width: e.size + 'px', height: e.size + 'px', borderRadius: '50%',
+          background: i % 2 === 0 ? 'rgba(255,160,40,0.95)' : 'rgba(255,100,20,0.9)',
+          boxShadow: '0 0 4px 2px rgba(255,120,20,0.4)',
+          pointerEvents: 'none', mixBlendMode: 'screen',
+          animation: `emberRise ${e.dur} ease-out ${e.delay} infinite`,
+          transform: 'translate(-50%, -50%)',
+        }} />
+      ))}
+
+      {/* Ciepła poświata całości */}
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 22% 45%, rgba(180,60,10,0.12) 0%, transparent 55%)', pointerEvents: 'none' }} />
+
+      {/* Gradient góra */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '120px',
+        background: 'linear-gradient(180deg, rgba(10,4,2,0.88) 0%, transparent 100%)', pointerEvents: 'none' }} />
+
+      {/* Header */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', alignItems: 'center', gap: '12px', padding: '20px 16px 0' }}>
+        <BackBtn onClick={onBack} />
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: '22px' }}>⚒️</span>
+            <h2 style={{ fontFamily: 'Cinzel', fontSize: '20px', fontWeight: 700, color: '#f0c060', margin: 0, textShadow: '0 0 16px rgba(240,140,20,0.6)' }}>Kuźnia</h2>
+          </div>
+          <p style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#7a5030', margin: '2px 0 0', fontStyle: 'italic' }}>Gorące palenisko goblinich kowali</p>
+        </div>
+      </div>
+
+      {/* Panel akcji – dół */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
+        background: 'linear-gradient(0deg, rgba(10,4,2,0.98) 0%, rgba(15,6,2,0.93) 55%, transparent 100%)',
+        padding: '12px 16px 32px' }}>
+
+        {/* Surowce */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', justifyContent: 'center' }}>
+          <ResourceChip icon="🪵" label="Drewno" amount={inventory.wood} color="#a07840" />
+          <ResourceChip icon="🪨" label="Ruda" amount={inventory.copperOre} color="#c07850" />
+          <ResourceChip icon="🔥" label="Żar" amount={inventory.forgeEmber} color="#f06020" />
+          <ResourceChip icon="🔶" label="Sztabka" amount={inventory.copperBar} color="#e09050" />
         </div>
 
-        {/* Resources quick view */}
-        <div className="gh-card" style={{ padding: '16px', marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div style={{ fontFamily: 'Cinzel', fontSize: '11px', color: '#6a5040', letterSpacing: '0.08em', marginBottom: '4px' }}>
-            SUROWCE
-          </div>
-          <ResourceLine icon="🪵" label="Drewno" amount={inventory.wood} />
-          <ResourceLine icon="🪨" label="Ruda miedzi" amount={inventory.copperOre} />
-          <ResourceLine icon="🔥" label="Żar Kuźni" amount={inventory.forgeEmber} />
-          <ResourceLine icon="🔶" label="Sztabka miedzi" amount={inventory.copperBar} />
-        </div>
-
-        {/* Action 1: Light fire */}
-        <div className="gh-card" style={{ padding: '20px', marginBottom: '14px' }}>
-          <div style={{ fontFamily: 'Cinzel', fontSize: '13px', color: '#d4a870', letterSpacing: '0.05em', marginBottom: '8px' }}>
-            ⚗️ Rozpal piec
-          </div>
-          <div style={{ fontFamily: 'Crimson Text', fontSize: '15px', color: '#6a5040', marginBottom: '16px', fontStyle: 'italic' }}>
-            Zużywa: 🪵 Drewno ×1 · Daje: 🔥 Żar Kuźni ×1
-          </div>
-          <button
-            className={canLight ? 'btn-primary' : 'btn-primary'}
-            style={canLight ? {} : {}}
-            onClick={handleLight}
-            disabled={!canLight}
-          >
-            {canLight ? 'Rozpal piec' : 'Potrzebujesz drewna'}
+        {/* Akcja 1 */}
+        <div style={{ marginBottom: '10px' }}>
+          <p style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#6a4830', margin: '0 0 6px', fontStyle: 'italic', textAlign: 'center' }}>
+            🪵 Drewno ×1 → 🔥 Żar ×1
+          </p>
+          <button className="btn-primary" onClick={handleLight} disabled={!canLight}>
+            {canLight ? '⚗️ Rozpal piec' : 'Potrzebujesz drewna'}
           </button>
-          {!canLight && (
-            <div style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#7a4a30', marginTop: '8px', textAlign: 'center', fontStyle: 'italic' }}>
-              Idź do lasu po drewno
-            </div>
-          )}
         </div>
 
-        {/* Action 2: Smelt */}
-        <div className={`gh-card ${canSmelt ? 'glow-amber' : ''}`} style={{ padding: '20px', marginBottom: '24px', transition: 'box-shadow 0.3s' }}>
-          <div style={{ fontFamily: 'Cinzel', fontSize: '13px', color: '#d4a870', letterSpacing: '0.05em', marginBottom: '8px' }}>
-            🔥 Przetop rudę
-          </div>
-          <div style={{ fontFamily: 'Crimson Text', fontSize: '15px', color: '#6a5040', marginBottom: '16px', fontStyle: 'italic' }}>
-            Zużywa: 🔥 Żar ×1 + 🪨 Ruda ×2 · Daje: 🔶 Sztabka ×1
-          </div>
-          <button
-            className="btn-secondary"
-            onClick={handleSmelt}
-            disabled={!canSmelt}
-          >
-            {canSmelt ? 'Przetop rudę miedzi' : 'Niewystarczające zasoby'}
+        {/* Akcja 2 */}
+        <div>
+          <p style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#506030', margin: '0 0 6px', fontStyle: 'italic', textAlign: 'center' }}>
+            🔥 Żar ×1 + 🪨 Ruda ×2 → 🔶 Sztabka ×1
+          </p>
+          <button className="btn-secondary" onClick={handleSmelt} disabled={!canSmelt}>
+            {canSmelt ? '🔥 Przetop rudę miedzi' : 'Niewystarczające zasoby'}
           </button>
-          {!canSmelt && (
-            <div style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#4a5030', marginTop: '8px', textAlign: 'center', fontStyle: 'italic' }}>
-              Potrzebujesz Żaru ×1 i Rudy ×2
-            </div>
-          )}
         </div>
       </div>
     </div>
   )
 }
 
-function ResourceLine({ icon, label, amount }: { icon: string; label: string; amount: number }) {
+function ResourceChip({ icon, label, amount, color }: { icon: string; label: string; amount: number; color: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <span style={{ fontFamily: 'Crimson Text', fontSize: '16px', color: '#9a7850', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span>{icon}</span> {label}
-      </span>
-      <span style={{ fontFamily: 'Cinzel', fontSize: '18px', fontWeight: 700, color: amount > 0 ? '#f0c060' : '#4a3828' }}>
-        {amount}
-      </span>
+    <div style={{
+      background: 'rgba(0,0,0,0.6)', border: `1px solid ${amount > 0 ? color + '55' : '#2a1a0a'}`,
+      borderRadius: '10px', padding: '6px 10px', textAlign: 'center', minWidth: '60px',
+      backdropFilter: 'blur(4px)',
+    }}>
+      <div style={{ fontSize: '18px', lineHeight: 1, marginBottom: '2px' }}>{icon}</div>
+      <div style={{ fontFamily: 'Cinzel', fontSize: '16px', fontWeight: 700, color: amount > 0 ? color : '#3a2810', lineHeight: 1 }}>{amount}</div>
+      <div style={{ fontFamily: 'Crimson Text', fontSize: '10px', color: '#4a3020', letterSpacing: '0.03em' }}>{label}</div>
     </div>
+  )
+}
+
+function BackBtn({ onClick }: { onClick: () => void }) {
+  return (
+    <button onClick={onClick} style={{
+      background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,200,80,0.15)',
+      borderRadius: '10px', color: '#8a6040', fontFamily: 'Cinzel', fontSize: '16px',
+      width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', backdropFilter: 'blur(4px)',
+    }}>←</button>
   )
 }

@@ -32,11 +32,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-#root {
-  display: flex;
-  flex-direction: column;
-}
-
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: var(--bg-stone); }
@@ -181,4 +176,128 @@ body {
 
 .loot-pop {
   animation: lootPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ─── Ambient animations ─────────────────────────────────────────────────── */
+
+/* Forge fire pulse */
+.amb-forge-glow {
+  animation: ambiForge 2.2s ease-in-out infinite;
+}
+@keyframes ambiForge {
+  0%, 100% { opacity: 0.7; transform: scale(1);    }
+  40%       { opacity: 1.0; transform: scale(1.15); }
+  70%       { opacity: 0.8; transform: scale(0.95); }
+}
+
+/* Mine crystal shimmer */
+.amb-mine-glow {
+  animation: ambiMine 3.5s ease-in-out infinite;
+}
+@keyframes ambiMine {
+  0%, 100% { opacity: 0.5; transform: scale(1);    }
+  50%       { opacity: 0.9; transform: scale(1.2);  }
+}
+
+/* Forest crystal shimmer */
+.amb-forest-glow {
+  animation: ambiForest 4s ease-in-out infinite;
+}
+@keyframes ambiForest {
+  0%, 100% { opacity: 0.45; transform: scale(1);    }
+  33%       { opacity: 0.8;  transform: scale(1.15); }
+  66%       { opacity: 0.5;  transform: scale(0.9);  }
+}
+
+/* Lantern flicker */
+.amb-lantern {
+  animation: ambiLantern 1.6s ease-in-out infinite;
+}
+@keyframes ambiLantern {
+  0%, 100% { opacity: 0.9; transform: translate(-50%,-50%) scale(1);    }
+  25%       { opacity: 0.5; transform: translate(-50%,-50%) scale(0.8);  }
+  50%       { opacity: 1.0; transform: translate(-50%,-50%) scale(1.1);  }
+  75%       { opacity: 0.7; transform: translate(-50%,-50%) scale(0.95); }
+}
+
+/* Magic forest particles float up */
+.amb-particle {
+  animation: ambiParticle 3s ease-in-out infinite;
+}
+@keyframes ambiParticle {
+  0%   { opacity: 0;    transform: translate(-50%, -50%) translateY(0px)  scale(0.5); }
+  20%  { opacity: 0.9;  transform: translate(-50%, -50%) translateY(-6px) scale(1);   }
+  80%  { opacity: 0.6;  transform: translate(-50%, -50%) translateY(-18px) scale(0.8);}
+  100% { opacity: 0;    transform: translate(-50%, -50%) translateY(-28px) scale(0.4);}
+}
+
+/* ─── UI element animations ─────────────────────────────────────────────── */
+
+/* Baner – lekki float */
+@keyframes banerFloat {
+  0%, 100% { transform: translateY(0px);   }
+  50%       { transform: translateY(-4px);  }
+}
+
+/* Plecak – delikatny bounce */
+@keyframes backpackFloat {
+  0%, 100% { transform: scale(1) translateY(0px);  }
+  50%       { transform: scale(1) translateY(-5px); }
+}
+
+/* Glow pod plecakiem */
+@keyframes backpackGlow {
+  0%, 100% { opacity: 0.4; transform: translateX(-50%) scaleX(1);    }
+  50%       { opacity: 0.8; transform: translateX(-50%) scaleX(1.2);  }
+}
+
+/* ─── Scene-specific animations ─────────────────────────────────────────── */
+
+/* Leśne pyłki – unoszą się i zanikają */
+@keyframes forestFloat {
+  0%   { opacity: 0;   transform: translate(-50%,-50%) translateY(0)    scale(0.5); }
+  20%  { opacity: 0.8; transform: translate(-50%,-50%) translateY(-8px)  scale(1);   }
+  80%  { opacity: 0.5; transform: translate(-50%,-50%) translateY(-22px) scale(0.7); }
+  100% { opacity: 0;   transform: translate(-50%,-50%) translateY(-36px) scale(0.3); }
+}
+
+/* Świetliki – mrugają */
+@keyframes fireflyBlink {
+  0%, 100% { opacity: 0.1; transform: translate(-50%,-50%) scale(0.6); }
+  40%       { opacity: 1;   transform: translate(-50%,-50%) scale(1.2); }
+  60%       { opacity: 0.7; transform: translate(-50%,-50%) scale(1);   }
+}
+
+/* Pył kopalni – dryfuje powoli */
+@keyframes mineDust {
+  0%   { opacity: 0;   transform: translate(-50%,-50%) translateY(0) translateX(0); }
+  30%  { opacity: 0.5; }
+  70%  { opacity: 0.3; }
+  100% { opacity: 0;   transform: translate(-50%,-50%) translateY(-30px) translateX(8px); }
+}
+
+/* Iskry z kuźni – lecą do góry i gasną */
+@keyframes emberRise {
+  0%   { opacity: 0.9; transform: translate(-50%,-50%) translateY(0)    scale(1);   }
+  60%  { opacity: 0.7; transform: translate(-50%,-50%) translateY(-60px) scale(0.8); }
+  100% { opacity: 0;   transform: translate(-50%,-50%) translateY(-100px) scale(0.3) translateX(12px); }
+}
+
+/* ─── Hotspot buttons ────────────────────────────────────────────────────── */
+
+.hotspot-btn {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: hover) {
+  .hotspot-btn:hover .hotspot-label {
+    opacity: 1 !important;
+  }
+}
+
+.hotspot-btn:active {
+  transform: scale(0.98);
+}
+.hotspot-btn:active .hotspot-label {
+  opacity: 1 !important;
 }

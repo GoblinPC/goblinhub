@@ -239,14 +239,18 @@ export default function Settlement({ onNavigate }: Props) {
               left: `${lx}%`, top: `${ly}%`,
               width: `${lr * 2}%`, aspectRatio: '1',
               transform: 'translate(-50%, -50%)',
-              borderRadius: '50%',
-              background: `radial-gradient(circle, ${light.color} 0%, transparent 70%)`,
-              filter: 'blur(8px)',
-              mixBlendMode: 'screen',
               pointerEvents: 'none',
               zIndex: light.onHover ? 6 : 4,
-              animation: LIGHT_ANIM_CSS[light.anim],
             }}>
+              {/* inner div animates scale without touching outer translate */}
+              <div style={{
+                width: '100%', height: '100%',
+                borderRadius: '50%',
+                background: `radial-gradient(circle, ${light.color} 0%, transparent 70%)`,
+                filter: 'blur(8px)',
+                mixBlendMode: 'screen',
+                animation: LIGHT_ANIM_CSS[light.anim],
+              }} />
               {light.label && (
                 <span style={{
                   position: 'absolute', top: '110%', left: '50%', transform: 'translateX(-50%)',

@@ -68,14 +68,15 @@ function buildTr(W: number, H: number): Tr {
   const dS  = Math.max(W / LAND_W, H / PORT_H)
   const dCx = (LAND_W * dS - W) / 2
   const cOff = (LAND_W - PORT_W) / 2                     // portrait content start in 16:9 (px)
-  const sx = CAL_W * dS / (mS * W)                       // scale factor X
-  const sy = CAL_H / H                                   // scale factor Y
+  const sx = CAL_W * dS / (mS * W)
+  // sy: for height-limited screens (dS=H/PORT_H) this equals 1 — y positions are invariant
+  const sy = PORT_H * dS / H
   return {
     x: (p: number) => {
       const imgPx = (p / 100 * CAL_W + mCx) / mS
       return ((cOff + imgPx) * dS - dCx) / W * 100
     },
-    y: (p: number) => p * CAL_H / H,
+    y: (p: number) => p * sy,
     r: (v: number) => v * sx,
     idx: 1 / sx,
     idy: 1 / sy,
@@ -271,7 +272,7 @@ export default function Settlement({ onNavigate }: Props) {
         if (!raw) return null
         // Apply coordinate transform for current screen
         const p = isLandscape
-          ? { left: tr.x(raw.left), top: tr.y(raw.top), width: raw.width * tr.r(1), height: raw.height * (CAL_H / H) }
+          ? { left: tr.x(raw.left), top: tr.y(raw.top), width: raw.width / tr.idx, height: raw.height / tr.idy }
           : raw
         const isSel = IS_TOUCH && selected === id
         return (
@@ -302,7 +303,7 @@ export default function Settlement({ onNavigate }: Props) {
         style={{ position: 'absolute', bottom: 6, right: 8, zIndex: 100, width: 22, height: 22, borderRadius: '50%', background: debug ? 'rgba(255,80,80,0.85)' : 'rgba(60,60,60,0.4)', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', touchAction: 'manipulation', fontSize: 10, color: '#fff' }}
       >D</button>
 
-      {debug && <DebugEditor pos={pos} onChange={updatePos} onClose={() => setDebug(false)} />}
+      {debug && <DebugEditor pos={pos} onChange={updatePos} onClose={() => setDebug(false)} tr={tr} />}
     </div>
   )
 }
@@ -317,7 +318,7 @@ type DragTarget =
 const DEBUG_COLORS = ['#ff5050','#50ff50','#5080ff','#ffc800','#ff50ff','#50ffff','#ffa000']
 const HOVER_OPTIONS = ['', 'mine', 'expeditions', 'forge', 'forest', 'shop', 'totem', 'lantern']
 
-function DebugEditor({ pos, onChange, onClose }: { pos: LivePos; onChange: (p: LivePos) => void; onClose: () => void }) {
+function DebugEditor({ pos, onChange, onClose, tr }: { pos: LivePos; onChange: (p: LivePos) => void; onClose: () => void; tr: Tr }) {
   const selfRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ target: DragTarget; startClient: [number,number]; startVal: number[]; moved: boolean } | null>(null)
   const posRef  = useRef(pos); posRef.current = pos
@@ -337,8 +338,9 @@ function DebugEditor({ pos, onChange, onClose }: { pos: LivePos; onChange: (p: L
     if (!dragRef.current) return
     const { target, startClient, startVal } = dragRef.current
     const b = bsize()
-    const dx = ((e.clientX - startClient[0]) / b.width)  * 100
-    const dy = ((e.clientY - startClient[1]) / b.height) * 100
+    // Scale drag deltas from desktop-% to mobile-calibrated-% so stored positions are correct
+    const dx = ((e.clientX - startClient[0]) / b.width)  * 100 * tr.idx
+    const dy = ((e.clientY - startClient[1]) / b.height) * 100 * tr.idy
     if (Math.abs(dx) > 0.3 || Math.abs(dy) > 0.3) dragRef.current.moved = true
     const cur = posRef.current
 
@@ -402,22 +404,26 @@ function DebugEditor({ pos, onChange, onClose }: { pos: LivePos; onChange: (p: L
       </div>
 
       {/* ── Hotspot rects ────────────────────────────────────────── */}
-      {tab === 'hotspots' && Object.entries(pos.hpos).map(([id, p], i) => (
-        <div key={id} style={{ position:'absolute', left:`${p.left}%`, top:`${p.top}%`, width:`${p.width}%`, height:`${p.height}%`, border:`2px solid ${DEBUG_COLORS[i%DEBUG_COLORS.length]}`, background:`${DEBUG_COLORS[i%DEBUG_COLORS.length]}20`, boxSizing:'border-box', cursor:'move' }}
-          onPointerDown={e => startDrag(e, {kind:'hotspot',id,mode:'move'}, [p.left,p.top])}>
-          <span style={{ position:'absolute', top:2, left:3, fontFamily:'monospace', fontSize:11, color:'#fff', background:'rgba(0,0,0,0.75)', padding:'1px 5px', userSelect:'none', pointerEvents:'none' }}>{id}</span>
-          <div style={{ position:'absolute', bottom:0, right:0, width:18, height:18, background:DEBUG_COLORS[i%DEBUG_COLORS.length], cursor:'nwse-resize' }}
-            onPointerDown={e => startDrag(e, {kind:'hotspot',id,mode:'resize'}, [p.width,p.height])} />
-        </div>
-      ))}
+      {tab === 'hotspots' && Object.entries(pos.hpos).map(([id, p], i) => {
+        const tp = { left: tr.x(p.left), top: tr.y(p.top), width: p.width/tr.idx, height: p.height/tr.idy }
+        return (
+          <div key={id} style={{ position:'absolute', left:`${tp.left}%`, top:`${tp.top}%`, width:`${tp.width}%`, height:`${tp.height}%`, border:`2px solid ${DEBUG_COLORS[i%DEBUG_COLORS.length]}`, background:`${DEBUG_COLORS[i%DEBUG_COLORS.length]}20`, boxSizing:'border-box', cursor:'move' }}
+            onPointerDown={e => startDrag(e, {kind:'hotspot',id,mode:'move'}, [p.left,p.top])}>
+            <span style={{ position:'absolute', top:2, left:3, fontFamily:'monospace', fontSize:11, color:'#fff', background:'rgba(0,0,0,0.75)', padding:'1px 5px', userSelect:'none', pointerEvents:'none' }}>{id}</span>
+            <div style={{ position:'absolute', bottom:0, right:0, width:18, height:18, background:DEBUG_COLORS[i%DEBUG_COLORS.length], cursor:'nwse-resize' }}
+              onPointerDown={e => startDrag(e, {kind:'hotspot',id,mode:'resize'}, [p.width,p.height])} />
+          </div>
+        )
+      })}
 
       {/* ── Light dots ───────────────────────────────────────────── */}
       {tab === 'lights' && pos.lights.map(light => {
         const isSel = light.id === selectedLight
+        const lx = tr.x(light.x), ly = tr.y(light.y)
         return (
           <div key={light.id}
             onPointerDown={e => startDrag(e, {kind:'light',id:light.id}, [light.x, light.y])}
-            style={{ position:'absolute', left:`${light.x}%`, top:`${light.y}%`, width:18, height:18, borderRadius:'50%', background: isSel ? '#fff' : light.color, border: isSel ? '3px solid #ffc800' : '2px solid rgba(255,255,255,0.6)', transform:'translate(-50%,-50%)', cursor:'grab', zIndex:95 }}>
+            style={{ position:'absolute', left:`${lx}%`, top:`${ly}%`, width:18, height:18, borderRadius:'50%', background: isSel ? '#fff' : light.color, border: isSel ? '3px solid #ffc800' : '2px solid rgba(255,255,255,0.6)', transform:'translate(-50%,-50%)', cursor:'grab', zIndex:95 }}>
             <span style={{ position:'absolute', top:18, left:0, fontFamily:'monospace', fontSize:9, color:'#fff', background:'rgba(0,0,0,0.85)', whiteSpace:'nowrap', padding:'1px 3px', pointerEvents:'none' }}>💡{light.id}</span>
           </div>
         )

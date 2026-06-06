@@ -180,6 +180,7 @@ export default function Settlement({ onNavigate }: Props) {
             width: `${light.r * 2}%`, aspectRatio: '1',
             transform: 'translate(-50%, -50%)',
             pointerEvents: 'none',
+            opacity: 0.55,
             zIndex: light.onHover ? 6 : 4,
           }}>
             <div style={{
@@ -190,16 +191,25 @@ export default function Settlement({ onNavigate }: Props) {
               mixBlendMode: 'screen',
               animation: LIGHT_ANIM_CSS[light.anim],
             }} />
-            {light.label && (
-              <span style={{
-                position: 'absolute', top: '110%', left: '50%', transform: 'translateX(-50%)',
-                fontFamily: 'Cinzel', fontSize: 11, fontWeight: 700, color: '#e8f4ff',
-                textShadow: '0 0 8px rgba(40,140,255,0.9), 0 1px 4px rgba(0,0,0,0.95)',
-                whiteSpace: 'nowrap', letterSpacing: '0.1em',
-                background: 'rgba(0,10,30,0.65)', borderRadius: 5, padding: '1px 6px',
-              }}>{light.label}</span>
-            )}
           </div>
+        ))
+      }
+
+      {/* ── Etykiety świateł — renderowane nad glow ──────────────── */}
+      {pos.lights
+        .filter(l => l.label && (!l.onHover || l.onHover === active))
+        .map(light => (
+          <span key={`lbl-${light.id}`} style={{
+            position: 'absolute',
+            left: `${light.x}%`, top: `${light.y}%`,
+            transform: 'translate(-50%, calc(-50% - 12px))',
+            fontFamily: 'Cinzel', fontSize: 11, fontWeight: 700, color: '#e8f4ff',
+            textShadow: '0 0 8px rgba(40,140,255,0.9), 0 1px 4px rgba(0,0,0,0.95)',
+            whiteSpace: 'nowrap', letterSpacing: '0.1em',
+            background: 'rgba(0,10,30,0.75)', borderRadius: 5, padding: '2px 8px',
+            pointerEvents: 'none',
+            zIndex: 20,
+          }}>{light.label}</span>
         ))
       }
 

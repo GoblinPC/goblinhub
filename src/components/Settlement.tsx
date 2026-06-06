@@ -23,11 +23,17 @@ export interface Light {
   label?: string    // optional text label shown on the light
 }
 
-const LIGHT_ANIM_CSS: Record<Light['anim'], string> = {
-  none:    'none',
-  pulse:   'lightPulse 2s ease-in-out infinite',
-  flicker: 'lightPulse 0.55s ease-in-out infinite',
-  blink:   'lightBlink 1.2s ease-in-out infinite',
+// Returns animation string with per-light randomized duration and delay
+// Uses light.id as seed so values are stable across re-renders
+function lightAnim(anim: Light['anim'], id: number): string {
+  if (anim === 'none') return 'none'
+  const r1 = ((id * 2654435761) >>> 0) / 0xFFFFFFFF  // cheap hash
+  const r2 = ((id * 2246822519) >>> 0) / 0xFFFFFFFF
+  const delay = -(r1 * 4).toFixed(2) + 's'  // negative = start mid-cycle
+  if (anim === 'pulse')   return `lightPulse ${(1.6 + r2 * 1.2).toFixed(2)}s ease-in-out ${delay} infinite`
+  if (anim === 'flicker') return `lightPulse ${(0.4 + r2 * 0.3).toFixed(2)}s ease-in-out ${delay} infinite`
+  if (anim === 'blink')   return `lightBlink ${(0.9 + r2 * 0.7).toFixed(2)}s ease-in-out ${delay} infinite`
+  return 'none'
 }
 
 const COLOR_PRESETS = [
@@ -159,8 +165,7 @@ export default function Settlement({ onNavigate }: Props) {
         gap: 4,
         padding: '0 24px',
         height: 48,
-        background: 'linear-gradient(180deg, rgba(4,2,1,0.92) 0%, rgba(4,2,1,0.7) 80%, transparent 100%)',
-        borderBottom: '1px solid rgba(200,150,50,0.15)',
+        background: 'linear-gradient(180deg, rgba(4,2,1,0.92) 0%, rgba(4,2,1,0.7) 85%, transparent 100%)',
       }}>
         {([
           { id: 'forge',       label: 'Kuźnia',      icon: '⚒️' },
@@ -212,7 +217,7 @@ export default function Settlement({ onNavigate }: Props) {
               background: `radial-gradient(circle, ${light.color} 0%, transparent 70%)`,
               filter: 'blur(8px)',
               mixBlendMode: 'screen',
-              animation: LIGHT_ANIM_CSS[light.anim],
+              animation: lightAnim(light.anim, light.id),
             }} />
           </div>
         ))

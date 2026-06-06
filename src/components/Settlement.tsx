@@ -117,9 +117,6 @@ interface Props {
   onNavigate: (screen: Screen) => void
 }
 
-// Detect touch/no-hover device once at module level (safe in browser SPA)
-const IS_TOUCH = typeof window !== 'undefined' && !window.matchMedia('(hover: hover) and (pointer: fine)').matches
-
 function navigate(id: string, cb: (s: Screen) => void) {
   if      (id === 'forge')       cb('forge')
   else if (id === 'forest')      cb('forest')
@@ -133,46 +130,31 @@ function navigate(id: string, cb: (s: Screen) => void) {
 export default function Settlement({ onNavigate }: Props) {
   const [hovered, setHovered] = useState<HoveredBuilding>(null)
   const hoverRef = useRef<HoveredBuilding>(null)
-  const [selected, setSelected] = useState<HoveredBuilding>(null)
   const [debug, setDebug] = useState(false)
   const [pos, setPos] = useState<LivePos>(loadLivePos)
-
-  const active: HoveredBuilding = IS_TOUCH ? selected : hovered
 
   useEffect(() => { startHubMusic(); return () => stopHubMusic() }, [])
 
   function updatePos(next: LivePos) { setPos(next); saveLivePos(next) }
 
   function onEnter(id: Exclude<HoveredBuilding, null>) {
-    if (IS_TOUCH) return
     if (hoverRef.current === id) return
     hoverRef.current = id; setHovered(id)
     if (id === 'forge' || id === 'forest') playHoverPreview(id)
   }
   function onLeave() {
-    if (IS_TOUCH) return
     hoverRef.current = null; setHovered(null); stopHoverPreview()
   }
 
-  function handleClick(id: Exclude<HoveredBuilding, null>) {
-    if (IS_TOUCH) {
-      if (selected === id) { setSelected(null); navigate(id, onNavigate) }
-      else setSelected(id)
-      return
-    }
-    onLeave(); navigate(id, onNavigate)
-  }
-
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100dvh', overflow: 'hidden', background: '#0a0806' }}
-      onClick={IS_TOUCH ? e => { if (e.target === e.currentTarget) setSelected(null) } : undefined}>
+    <div style={{ position: 'relative', width: '100%', height: '100dvh', overflow: 'hidden', background: '#0a0806' }}>
 
       <img src="/assets/backgrounds/hub_16-9.png" alt="" draggable={false}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', userSelect: 'none', pointerEvents: 'none' }} />
 
       {/* ── Manualne światła ─────────────────────────────────────── */}
       {pos.lights
-        .filter(l => !l.onHover || l.onHover === active)
+        .filter(l => !l.onHover || l.onHover === hovered)
         .map(light => (
           <div key={light.id} style={{
             position: 'absolute',
@@ -197,7 +179,7 @@ export default function Settlement({ onNavigate }: Props) {
 
       {/* ── Etykiety świateł — renderowane nad glow ──────────────── */}
       {pos.lights
-        .filter(l => l.label && (!l.onHover || l.onHover === active))
+        .filter(l => l.label && (!l.onHover || l.onHover === hovered))
         .map(light => (
           <span key={`lbl-${light.id}`} style={{
             position: 'absolute',
@@ -217,22 +199,18 @@ export default function Settlement({ onNavigate }: Props) {
       {Object.keys(HOTSPOT_LABELS).map(id => {
         const p = pos.hpos[id]
         if (!p) return null
-        const isSel = IS_TOUCH && selected === id
         return (
           <button key={id} aria-label={HOTSPOT_LABELS[id]} className="hotspot-btn"
-            data-selected={isSel ? 'true' : undefined}
             onPointerEnter={() => onEnter(id as Exclude<HoveredBuilding,null>)}
             onPointerLeave={onLeave}
-            onClick={() => handleClick(id as Exclude<HoveredBuilding,null>)}
-            style={{ position: 'absolute', left: `${p.left}%`, top: `${p.top}%`, width: `${p.width}%`, height: `${p.height}%`, background: isSel ? 'rgba(255,220,80,0.08)' : 'transparent', border: isSel ? '1px solid rgba(255,220,80,0.3)' : 'none', borderRadius: 12, cursor: 'pointer', touchAction: 'manipulation', zIndex: 5, transition: 'background 0.2s' }}
+            onClick={() => { onLeave(); navigate(id, onNavigate) }}
+            style={{ position: 'absolute', left: `${p.left}%`, top: `${p.top}%`, width: `${p.width}%`, height: `${p.height}%`, background: 'transparent', border: 'none', borderRadius: 12, cursor: 'pointer', touchAction: 'manipulation', zIndex: 5 }}
           >
             <span className="hotspot-label" style={{
               position: 'absolute', bottom: '8%', left: '50%', transform: 'translateX(-50%)',
               fontFamily: 'Cinzel', fontSize: 12, fontWeight: 700, color: '#f0d080',
               letterSpacing: '0.06em', textShadow: '0 1px 8px rgba(0,0,0,0.95)',
-              whiteSpace: 'nowrap', pointerEvents: 'none',
-              opacity: IS_TOUCH ? (isSel ? 1 : 0.45) : 0,
-              transition: 'opacity 0.2s',
+              whiteSpace: 'nowrap', pointerEvents: 'none', opacity: 0, transition: 'opacity 0.2s',
               background: 'rgba(8,5,2,0.7)', borderRadius: 7, padding: '2px 8px', backdropFilter: 'blur(4px)',
             }}>{HOTSPOT_LABELS[id]}</span>
           </button>

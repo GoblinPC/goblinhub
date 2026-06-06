@@ -41,6 +41,57 @@ const COLOR_PRESETS = [
   { label: 'Biały',     value: 'rgba(200,220,255,0.65)' },
 ]
 
+// ─── Coordinate transform (mobile-calibrated → current screen) ───────────────
+// All stored positions are calibrated on a portrait mobile screen (CAL_W × CAL_H).
+// On landscape/desktop we render the 16:9 image full-screen and remap coordinates
+// so hotspots/lights stay over the correct buildings regardless of screen size.
+
+const PORT_W = 941, PORT_H = 1672  // portrait source image
+const LAND_W = 2972                 // 16:9 image width (same height PORT_H)
+const CAL_W  = 390, CAL_H = 844    // calibration reference (mobile portrait)
+
+interface Tr {
+  x:    (v: number) => number   // % left
+  y:    (v: number) => number   // % top
+  r:    (v: number) => number   // radius % of width
+  idx:  number                  // inverse delta scale X (for drag)
+  idy:  number                  // inverse delta scale Y (for drag)
+}
+const ID_TR: Tr = { x: v => v, y: v => v, r: v => v, idx: 1, idy: 1 }
+
+function buildTr(W: number, H: number): Tr {
+  if (W / H < 1.0) return ID_TR   // portrait: identity
+  // Mobile rendering of portrait image
+  const mS = Math.max(CAL_W / PORT_W, CAL_H / PORT_H)   // ~0.505
+  const mCx = (PORT_W * mS - CAL_W) / 2                 // ~42.5 px clipped each side
+  // Desktop rendering of 16:9 image
+  const dS  = Math.max(W / LAND_W, H / PORT_H)
+  const dCx = (LAND_W * dS - W) / 2
+  const cOff = (LAND_W - PORT_W) / 2                     // portrait content start in 16:9 (px)
+  const sx = CAL_W * dS / (mS * W)                       // scale factor X
+  const sy = CAL_H / H                                   // scale factor Y
+  return {
+    x: (p: number) => {
+      const imgPx = (p / 100 * CAL_W + mCx) / mS
+      return ((cOff + imgPx) * dS - dCx) / W * 100
+    },
+    y: (p: number) => p * CAL_H / H,
+    r: (v: number) => v * sx,
+    idx: 1 / sx,
+    idy: 1 / sy,
+  }
+}
+
+function useWindowSize() {
+  const [s, setS] = useState({ w: window.innerWidth, h: window.innerHeight })
+  useEffect(() => {
+    const fn = () => setS({ w: window.innerWidth, h: window.innerHeight })
+    window.addEventListener('resize', fn)
+    return () => window.removeEventListener('resize', fn)
+  }, [])
+  return s
+}
+
 // ─── Live positions (all persisted in localStorage) ───────────────────────────
 
 export interface HPos { top: number; left: number; width: number; height: number }
@@ -133,19 +184,19 @@ function navigate(id: string, cb: (s: Screen) => void) {
 export default function Settlement({ onNavigate }: Props) {
   const [hovered, setHovered] = useState<HoveredBuilding>(null)
   const hoverRef = useRef<HoveredBuilding>(null)
-  // Touch: first tap = select (show label/lights), second tap on same = navigate
   const [selected, setSelected] = useState<HoveredBuilding>(null)
   const [debug, setDebug] = useState(false)
   const [pos, setPos] = useState<LivePos>(loadLivePos)
+  const { w: W, h: H } = useWindowSize()
+  const tr = buildTr(W, H)
+  const isLandscape = W / H >= 1.0
 
-  // active = what determines hover-light visibility and label display
   const active: HoveredBuilding = IS_TOUCH ? selected : hovered
 
   useEffect(() => { startHubMusic(); return () => stopHubMusic() }, [])
 
   function updatePos(next: LivePos) { setPos(next); saveLivePos(next) }
 
-  // Desktop hover handlers
   function onEnter(id: Exclude<HoveredBuilding, null>) {
     if (IS_TOUCH) return
     if (hoverRef.current === id) return
@@ -157,29 +208,22 @@ export default function Settlement({ onNavigate }: Props) {
     hoverRef.current = null; setHovered(null); stopHoverPreview()
   }
 
-  // Touch: tap once = select, tap same = navigate, tap elsewhere = deselect
   function handleClick(id: Exclude<HoveredBuilding, null>) {
     if (IS_TOUCH) {
-      if (selected === id) {
-        setSelected(null)
-        navigate(id, onNavigate)
-      } else {
-        setSelected(id)
-      }
+      if (selected === id) { setSelected(null); navigate(id, onNavigate) }
+      else setSelected(id)
       return
     }
-    // Desktop: navigate immediately
-    onLeave()
-    navigate(id, onNavigate)
+    onLeave(); navigate(id, onNavigate)
   }
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100dvh', overflow: 'hidden', background: '#0a0806' }}
       onClick={IS_TOUCH ? e => { if (e.target === e.currentTarget) setSelected(null) } : undefined}>
 
-      {/* Responsive background: portrait on mobile, 16:9 on landscape/PC */}
+      {/* Background: portrait on mobile, 16:9 on landscape */}
       <picture style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
-        <source media="(min-aspect-ratio: 4/3)" srcSet="/assets/backgrounds/hub_16-9.png" />
+        <source media="(min-aspect-ratio: 1/1)" srcSet="/assets/backgrounds/hub_16-9.png" />
         <img src="/assets/backgrounds/settlement.webp" alt="" draggable={false}
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', userSelect: 'none', pointerEvents: 'none' }} />
       </picture>
@@ -187,37 +231,44 @@ export default function Settlement({ onNavigate }: Props) {
       {/* ── Manualne światła ─────────────────────────────────────── */}
       {pos.lights
         .filter(l => !l.onHover || l.onHover === active)
-        .map(light => (
-          <div key={light.id} style={{
-            position: 'absolute',
-            left: `${light.x}%`, top: `${light.y}%`,
-            width: `${light.r * 2}%`, aspectRatio: '1',
-            transform: 'translate(-50%, -50%)',
-            borderRadius: '50%',
-            background: `radial-gradient(circle, ${light.color} 0%, transparent 70%)`,
-            filter: 'blur(8px)',
-            mixBlendMode: 'screen',
-            pointerEvents: 'none',
-            zIndex: light.onHover ? 6 : 4,
-            animation: LIGHT_ANIM_CSS[light.anim],
-          }}>
-            {light.label && (
-              <span style={{
-                position: 'absolute', top: '110%', left: '50%', transform: 'translateX(-50%)',
-                fontFamily: 'Cinzel', fontSize: 11, fontWeight: 700, color: '#e8f4ff',
-                textShadow: '0 0 8px rgba(40,140,255,0.9), 0 1px 4px rgba(0,0,0,0.95)',
-                whiteSpace: 'nowrap', letterSpacing: '0.1em',
-                background: 'rgba(0,10,30,0.65)', borderRadius: 5, padding: '1px 6px',
-              }}>{light.label}</span>
-            )}
-          </div>
-        ))
+        .map(light => {
+          const lx = tr.x(light.x), ly = tr.y(light.y), lr = tr.r(light.r)
+          return (
+            <div key={light.id} style={{
+              position: 'absolute',
+              left: `${lx}%`, top: `${ly}%`,
+              width: `${lr * 2}%`, aspectRatio: '1',
+              transform: 'translate(-50%, -50%)',
+              borderRadius: '50%',
+              background: `radial-gradient(circle, ${light.color} 0%, transparent 70%)`,
+              filter: 'blur(8px)',
+              mixBlendMode: 'screen',
+              pointerEvents: 'none',
+              zIndex: light.onHover ? 6 : 4,
+              animation: LIGHT_ANIM_CSS[light.anim],
+            }}>
+              {light.label && (
+                <span style={{
+                  position: 'absolute', top: '110%', left: '50%', transform: 'translateX(-50%)',
+                  fontFamily: 'Cinzel', fontSize: 11, fontWeight: 700, color: '#e8f4ff',
+                  textShadow: '0 0 8px rgba(40,140,255,0.9), 0 1px 4px rgba(0,0,0,0.95)',
+                  whiteSpace: 'nowrap', letterSpacing: '0.1em',
+                  background: 'rgba(0,10,30,0.65)', borderRadius: 5, padding: '1px 6px',
+                }}>{light.label}</span>
+              )}
+            </div>
+          )
+        })
       }
 
       {/* ── Hotspoty ─────────────────────────────────────────────── */}
       {Object.keys(HOTSPOT_LABELS).map(id => {
-        const p = pos.hpos[id]
-        if (!p) return null
+        const raw = pos.hpos[id]
+        if (!raw) return null
+        // Apply coordinate transform for current screen
+        const p = isLandscape
+          ? { left: tr.x(raw.left), top: tr.y(raw.top), width: raw.width * tr.r(1), height: raw.height * (CAL_H / H) }
+          : raw
         const isSel = IS_TOUCH && selected === id
         return (
           <button key={id} aria-label={HOTSPOT_LABELS[id]} className="hotspot-btn"

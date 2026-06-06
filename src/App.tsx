@@ -30,6 +30,10 @@ export default function App() {
     setScreen('settlement')
   }
 
+  if (screen === 'settlement') {
+    return <Settlement onNavigate={setScreen} />
+  }
+
   return (
     <div style={{
       minHeight: '100dvh', width: '100%', maxWidth: '480px',
@@ -37,9 +41,6 @@ export default function App() {
       background: 'radial-gradient(ellipse at 50% 0%, #2a1a08 0%, #0e0b08 60%)',
       overflowX: 'hidden', overflowY: 'auto', position: 'relative',
     }}>
-      {screen === 'settlement' && (
-        <Settlement onNavigate={setScreen} />
-      )}
       {screen === 'forest' && (
         <Forest
           inventory={state.inventory}

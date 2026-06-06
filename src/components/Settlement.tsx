@@ -59,24 +59,24 @@ export interface LivePos {
   lights: Light[]
 }
 
-const LS_KEY = 'settlement_debug_v1'
+const LS_KEY = 'settlement_debug_v2'
 
 function defaultLivePos(): LivePos {
   return {
     hpos: {
-      forge:       { top: 10, left:  1, width: 34, height: 42 },
-      forest:      { top:  2, left: 62, width: 37, height: 34 },
-      mine:        { top: 52, left:  1, width: 23, height: 20 },
-      expeditions: { top:  0, left: 32, width: 32, height: 10 },
-      shop:        { top: 62, left: 54, width: 45, height: 30 },
-      totem:       { top: 37, left: 68, width: 14, height: 15 },
-      lantern:     { top: 60, left: 37, width: 18, height:  9 },
+      forge:       { top: 10, left: 36, width: 10, height: 42 },
+      forest:      { top:  2, left: 54, width: 11, height: 34 },
+      mine:        { top: 52, left: 36, width:  7, height: 20 },
+      expeditions: { top:  0, left: 45, width:  9, height: 10 },
+      shop:        { top: 62, left: 51, width: 13, height: 30 },
+      totem:       { top: 37, left: 55, width:  4, height: 15 },
+      lantern:     { top: 60, left: 46, width:  5, height:  9 },
     },
-    forge:    { x: 22, y: 30 },
-    mine:     { x: 12, y: 61 },
+    forge:    { x: 42, y: 30 },
+    mine:     { x: 39, y: 61 },
     crystals: [
-      { x: 63, y: 14 }, { x: 67, y: 16 }, { x: 65, y: 21 },
-      { x: 71, y: 22 }, { x: 74, y: 25 }, { x: 78, y: 19 }, { x: 69, y: 28 },
+      { x: 54, y: 14 }, { x: 55, y: 16 }, { x: 54, y: 21 },
+      { x: 56, y: 22 }, { x: 57, y: 25 }, { x: 58, y: 19 }, { x: 56, y: 28 },
     ],
     lights: [],
   }
@@ -109,7 +109,7 @@ function addDefaultHoverLights(p: LivePos): LivePos {
     lights.push({ id: newId(), x: p.mine.x, y: p.mine.y, r: 5, color: 'rgba(60,160,255,0.9)', anim: 'blink', onHover: 'mine', label: 'WEJŚCIE' })
   }
   if (!lights.some(l => l.onHover === 'expeditions')) {
-    lights.push({ id: newId(), x: 48, y: 4, r: 8, color: 'rgba(255,180,40,0.8)', anim: 'pulse', onHover: 'expeditions' })
+    lights.push({ id: newId(), x: 50, y: 4, r: 8, color: 'rgba(255,180,40,0.8)', anim: 'pulse', onHover: 'expeditions' })
   }
   return { ...p, lights }
 }

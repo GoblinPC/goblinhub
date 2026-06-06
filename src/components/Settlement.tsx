@@ -41,58 +41,6 @@ const COLOR_PRESETS = [
   { label: 'Biały',     value: 'rgba(200,220,255,0.65)' },
 ]
 
-// ─── Coordinate transform (mobile-calibrated → current screen) ───────────────
-// All stored positions are calibrated on a portrait mobile screen (CAL_W × CAL_H).
-// On landscape/desktop we render the 16:9 image full-screen and remap coordinates
-// so hotspots/lights stay over the correct buildings regardless of screen size.
-
-const PORT_W = 941, PORT_H = 1672  // portrait source image
-const LAND_W = 2972                 // 16:9 image width (same height PORT_H)
-const CAL_W  = 390, CAL_H = 844    // calibration reference (mobile portrait)
-
-interface Tr {
-  x:    (v: number) => number   // % left
-  y:    (v: number) => number   // % top
-  r:    (v: number) => number   // radius % of width
-  idx:  number                  // inverse delta scale X (for drag)
-  idy:  number                  // inverse delta scale Y (for drag)
-}
-const ID_TR: Tr = { x: v => v, y: v => v, r: v => v, idx: 1, idy: 1 }
-
-function buildTr(W: number, H: number): Tr {
-  if (W / H < 1.0) return ID_TR   // portrait: identity
-  // Mobile rendering of portrait image
-  const mS = Math.max(CAL_W / PORT_W, CAL_H / PORT_H)   // ~0.505
-  const mCx = (PORT_W * mS - CAL_W) / 2                 // ~42.5 px clipped each side
-  // Desktop rendering of 16:9 image
-  const dS  = Math.max(W / LAND_W, H / PORT_H)
-  const dCx = (LAND_W * dS - W) / 2
-  const cOff = (LAND_W - PORT_W) / 2                     // portrait content start in 16:9 (px)
-  const sx = CAL_W * dS / (mS * W)
-  // sy: for height-limited screens (dS=H/PORT_H) this equals 1 — y positions are invariant
-  const sy = PORT_H * dS / H
-  return {
-    x: (p: number) => {
-      const imgPx = (p / 100 * CAL_W + mCx) / mS
-      return ((cOff + imgPx) * dS - dCx) / W * 100
-    },
-    y: (p: number) => p * sy,
-    r: (v: number) => v * sx,
-    idx: 1 / sx,
-    idy: 1 / sy,
-  }
-}
-
-function useWindowSize() {
-  const [s, setS] = useState({ w: window.innerWidth, h: window.innerHeight })
-  useEffect(() => {
-    const fn = () => setS({ w: window.innerWidth, h: window.innerHeight })
-    window.addEventListener('resize', fn)
-    return () => window.removeEventListener('resize', fn)
-  }, [])
-  return s
-}
-
 // ─── Live positions (all persisted in localStorage) ───────────────────────────
 
 export interface HPos { top: number; left: number; width: number; height: number }
@@ -188,9 +136,6 @@ export default function Settlement({ onNavigate }: Props) {
   const [selected, setSelected] = useState<HoveredBuilding>(null)
   const [debug, setDebug] = useState(false)
   const [pos, setPos] = useState<LivePos>(loadLivePos)
-  const { w: W, h: H } = useWindowSize()
-  const tr = buildTr(W, H)
-  const isLandscape = W / H >= 1.0
 
   const active: HoveredBuilding = IS_TOUCH ? selected : hovered
 
@@ -222,58 +167,46 @@ export default function Settlement({ onNavigate }: Props) {
     <div style={{ position: 'relative', width: '100%', height: '100dvh', overflow: 'hidden', background: '#0a0806' }}
       onClick={IS_TOUCH ? e => { if (e.target === e.currentTarget) setSelected(null) } : undefined}>
 
-      {/* Background: portrait on mobile, 16:9 on landscape */}
-      <picture style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
-        <source media="(min-aspect-ratio: 1/1)" srcSet="/assets/backgrounds/hub_16-9.png" />
-        <img src="/assets/backgrounds/settlement.webp" alt="" draggable={false}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', userSelect: 'none', pointerEvents: 'none' }} />
-      </picture>
+      <img src="/assets/backgrounds/hub_16-9.png" alt="" draggable={false}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', userSelect: 'none', pointerEvents: 'none' }} />
 
       {/* ── Manualne światła ─────────────────────────────────────── */}
       {pos.lights
         .filter(l => !l.onHover || l.onHover === active)
-        .map(light => {
-          const lx = tr.x(light.x), ly = tr.y(light.y), lr = tr.r(light.r)
-          return (
-            <div key={light.id} style={{
-              position: 'absolute',
-              left: `${lx}%`, top: `${ly}%`,
-              width: `${lr * 2}%`, aspectRatio: '1',
-              transform: 'translate(-50%, -50%)',
-              pointerEvents: 'none',
-              zIndex: light.onHover ? 6 : 4,
-            }}>
-              {/* inner div animates scale without touching outer translate */}
-              <div style={{
-                width: '100%', height: '100%',
-                borderRadius: '50%',
-                background: `radial-gradient(circle, ${light.color} 0%, transparent 70%)`,
-                filter: 'blur(8px)',
-                mixBlendMode: 'screen',
-                animation: LIGHT_ANIM_CSS[light.anim],
-              }} />
-              {light.label && (
-                <span style={{
-                  position: 'absolute', top: '110%', left: '50%', transform: 'translateX(-50%)',
-                  fontFamily: 'Cinzel', fontSize: 11, fontWeight: 700, color: '#e8f4ff',
-                  textShadow: '0 0 8px rgba(40,140,255,0.9), 0 1px 4px rgba(0,0,0,0.95)',
-                  whiteSpace: 'nowrap', letterSpacing: '0.1em',
-                  background: 'rgba(0,10,30,0.65)', borderRadius: 5, padding: '1px 6px',
-                }}>{light.label}</span>
-              )}
-            </div>
-          )
-        })
+        .map(light => (
+          <div key={light.id} style={{
+            position: 'absolute',
+            left: `${light.x}%`, top: `${light.y}%`,
+            width: `${light.r * 2}%`, aspectRatio: '1',
+            transform: 'translate(-50%, -50%)',
+            pointerEvents: 'none',
+            zIndex: light.onHover ? 6 : 4,
+          }}>
+            <div style={{
+              width: '100%', height: '100%',
+              borderRadius: '50%',
+              background: `radial-gradient(circle, ${light.color} 0%, transparent 70%)`,
+              filter: 'blur(8px)',
+              mixBlendMode: 'screen',
+              animation: LIGHT_ANIM_CSS[light.anim],
+            }} />
+            {light.label && (
+              <span style={{
+                position: 'absolute', top: '110%', left: '50%', transform: 'translateX(-50%)',
+                fontFamily: 'Cinzel', fontSize: 11, fontWeight: 700, color: '#e8f4ff',
+                textShadow: '0 0 8px rgba(40,140,255,0.9), 0 1px 4px rgba(0,0,0,0.95)',
+                whiteSpace: 'nowrap', letterSpacing: '0.1em',
+                background: 'rgba(0,10,30,0.65)', borderRadius: 5, padding: '1px 6px',
+              }}>{light.label}</span>
+            )}
+          </div>
+        ))
       }
 
       {/* ── Hotspoty ─────────────────────────────────────────────── */}
       {Object.keys(HOTSPOT_LABELS).map(id => {
-        const raw = pos.hpos[id]
-        if (!raw) return null
-        // Apply coordinate transform for current screen
-        const p = isLandscape
-          ? { left: tr.x(raw.left), top: tr.y(raw.top), width: raw.width / tr.idx, height: raw.height / tr.idy }
-          : raw
+        const p = pos.hpos[id]
+        if (!p) return null
         const isSel = IS_TOUCH && selected === id
         return (
           <button key={id} aria-label={HOTSPOT_LABELS[id]} className="hotspot-btn"
@@ -303,7 +236,7 @@ export default function Settlement({ onNavigate }: Props) {
         style={{ position: 'absolute', bottom: 6, right: 8, zIndex: 100, width: 22, height: 22, borderRadius: '50%', background: debug ? 'rgba(255,80,80,0.85)' : 'rgba(60,60,60,0.4)', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', touchAction: 'manipulation', fontSize: 10, color: '#fff' }}
       >D</button>
 
-      {debug && <DebugEditor pos={pos} onChange={updatePos} onClose={() => setDebug(false)} tr={tr} />}
+      {debug && <DebugEditor pos={pos} onChange={updatePos} onClose={() => setDebug(false)} />}
     </div>
   )
 }
@@ -318,7 +251,7 @@ type DragTarget =
 const DEBUG_COLORS = ['#ff5050','#50ff50','#5080ff','#ffc800','#ff50ff','#50ffff','#ffa000']
 const HOVER_OPTIONS = ['', 'mine', 'expeditions', 'forge', 'forest', 'shop', 'totem', 'lantern']
 
-function DebugEditor({ pos, onChange, onClose, tr }: { pos: LivePos; onChange: (p: LivePos) => void; onClose: () => void; tr: Tr }) {
+function DebugEditor({ pos, onChange, onClose }: { pos: LivePos; onChange: (p: LivePos) => void; onClose: () => void }) {
   const selfRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ target: DragTarget; startClient: [number,number]; startVal: number[]; moved: boolean } | null>(null)
   const posRef  = useRef(pos); posRef.current = pos
@@ -338,9 +271,8 @@ function DebugEditor({ pos, onChange, onClose, tr }: { pos: LivePos; onChange: (
     if (!dragRef.current) return
     const { target, startClient, startVal } = dragRef.current
     const b = bsize()
-    // Scale drag deltas from desktop-% to mobile-calibrated-% so stored positions are correct
-    const dx = ((e.clientX - startClient[0]) / b.width)  * 100 * tr.idx
-    const dy = ((e.clientY - startClient[1]) / b.height) * 100 * tr.idy
+    const dx = ((e.clientX - startClient[0]) / b.width)  * 100
+    const dy = ((e.clientY - startClient[1]) / b.height) * 100
     if (Math.abs(dx) > 0.3 || Math.abs(dy) > 0.3) dragRef.current.moved = true
     const cur = posRef.current
 
@@ -404,26 +336,22 @@ function DebugEditor({ pos, onChange, onClose, tr }: { pos: LivePos; onChange: (
       </div>
 
       {/* ── Hotspot rects ────────────────────────────────────────── */}
-      {tab === 'hotspots' && Object.entries(pos.hpos).map(([id, p], i) => {
-        const tp = { left: tr.x(p.left), top: tr.y(p.top), width: p.width/tr.idx, height: p.height/tr.idy }
-        return (
-          <div key={id} style={{ position:'absolute', left:`${tp.left}%`, top:`${tp.top}%`, width:`${tp.width}%`, height:`${tp.height}%`, border:`2px solid ${DEBUG_COLORS[i%DEBUG_COLORS.length]}`, background:`${DEBUG_COLORS[i%DEBUG_COLORS.length]}20`, boxSizing:'border-box', cursor:'move' }}
-            onPointerDown={e => startDrag(e, {kind:'hotspot',id,mode:'move'}, [p.left,p.top])}>
-            <span style={{ position:'absolute', top:2, left:3, fontFamily:'monospace', fontSize:11, color:'#fff', background:'rgba(0,0,0,0.75)', padding:'1px 5px', userSelect:'none', pointerEvents:'none' }}>{id}</span>
-            <div style={{ position:'absolute', bottom:0, right:0, width:18, height:18, background:DEBUG_COLORS[i%DEBUG_COLORS.length], cursor:'nwse-resize' }}
-              onPointerDown={e => startDrag(e, {kind:'hotspot',id,mode:'resize'}, [p.width,p.height])} />
-          </div>
-        )
-      })}
+      {tab === 'hotspots' && Object.entries(pos.hpos).map(([id, p], i) => (
+        <div key={id} style={{ position:'absolute', left:`${p.left}%`, top:`${p.top}%`, width:`${p.width}%`, height:`${p.height}%`, border:`2px solid ${DEBUG_COLORS[i%DEBUG_COLORS.length]}`, background:`${DEBUG_COLORS[i%DEBUG_COLORS.length]}20`, boxSizing:'border-box', cursor:'move' }}
+          onPointerDown={e => startDrag(e, {kind:'hotspot',id,mode:'move'}, [p.left,p.top])}>
+          <span style={{ position:'absolute', top:2, left:3, fontFamily:'monospace', fontSize:11, color:'#fff', background:'rgba(0,0,0,0.75)', padding:'1px 5px', userSelect:'none', pointerEvents:'none' }}>{id}</span>
+          <div style={{ position:'absolute', bottom:0, right:0, width:18, height:18, background:DEBUG_COLORS[i%DEBUG_COLORS.length], cursor:'nwse-resize' }}
+            onPointerDown={e => startDrag(e, {kind:'hotspot',id,mode:'resize'}, [p.width,p.height])} />
+        </div>
+      ))}
 
       {/* ── Light dots ───────────────────────────────────────────── */}
       {tab === 'lights' && pos.lights.map(light => {
         const isSel = light.id === selectedLight
-        const lx = tr.x(light.x), ly = tr.y(light.y)
         return (
           <div key={light.id}
             onPointerDown={e => startDrag(e, {kind:'light',id:light.id}, [light.x, light.y])}
-            style={{ position:'absolute', left:`${lx}%`, top:`${ly}%`, width:18, height:18, borderRadius:'50%', background: isSel ? '#fff' : light.color, border: isSel ? '3px solid #ffc800' : '2px solid rgba(255,255,255,0.6)', transform:'translate(-50%,-50%)', cursor:'grab', zIndex:95 }}>
+            style={{ position:'absolute', left:`${light.x}%`, top:`${light.y}%`, width:18, height:18, borderRadius:'50%', background: isSel ? '#fff' : light.color, border: isSel ? '3px solid #ffc800' : '2px solid rgba(255,255,255,0.6)', transform:'translate(-50%,-50%)', cursor:'grab', zIndex:95 }}>
             <span style={{ position:'absolute', top:18, left:0, fontFamily:'monospace', fontSize:9, color:'#fff', background:'rgba(0,0,0,0.85)', whiteSpace:'nowrap', padding:'1px 3px', pointerEvents:'none' }}>💡{light.id}</span>
           </div>
         )

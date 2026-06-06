@@ -152,6 +152,47 @@ export default function Settlement({ onNavigate }: Props) {
       <img src="/assets/backgrounds/hub_16-9.png" alt="" draggable={false}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', userSelect: 'none', pointerEvents: 'none' }} />
 
+      {/* ── Navbar ───────────────────────────────────────────────── */}
+      <nav style={{
+        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: 4,
+        padding: '0 24px',
+        height: 48,
+        background: 'linear-gradient(180deg, rgba(4,2,1,0.92) 0%, rgba(4,2,1,0.7) 80%, transparent 100%)',
+        borderBottom: '1px solid rgba(200,150,50,0.15)',
+      }}>
+        {([
+          { id: 'forge',       label: 'Kuźnia',      icon: '⚒️' },
+          { id: 'forest',      label: 'Las',          icon: '🌲' },
+          { id: 'mine',        label: 'Kopalnia',     icon: '⛏️' },
+          { id: 'expeditions', label: 'Wyprawa',      icon: '⚔️' },
+          { id: 'shop',        label: 'Sklep',        icon: '🛒' },
+          { id: 'totem',       label: 'Ekwipunek',    icon: '🧝' },
+          { id: 'lantern',     label: 'Statystyki',   icon: '📊' },
+        ] as const).map(({ id, label, icon }) => (
+          <button key={id}
+            onMouseEnter={() => onEnter(id)}
+            onMouseLeave={onLeave}
+            onClick={() => { onLeave(); navigate(id, onNavigate) }}
+            style={{
+              background: hovered === id ? 'rgba(200,140,30,0.18)' : 'transparent',
+              border: 'none',
+              borderBottom: `2px solid ${hovered === id ? 'rgba(220,160,40,0.8)' : 'transparent'}`,
+              color: hovered === id ? '#f0c860' : '#9a7840',
+              fontFamily: 'Cinzel', fontSize: 12, fontWeight: 700,
+              padding: '0 14px', height: '100%',
+              cursor: 'pointer', touchAction: 'manipulation',
+              display: 'flex', alignItems: 'center', gap: 6,
+              transition: 'color 0.15s, background 0.15s, border-color 0.15s',
+              letterSpacing: '0.05em', whiteSpace: 'nowrap',
+            }}>
+            <span style={{ fontSize: 14 }}>{icon}</span>
+            {label}
+          </button>
+        ))}
+      </nav>
+
       {/* ── Manualne światła ─────────────────────────────────────── */}
       {pos.lights
         .filter(l => !l.onHover || l.onHover === hovered)

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { Screen, GameState } from './types'
-import { loadState, saveState, resetState } from './store'
+import { loadState, saveState, resetState, MAX_ENERGY, ENERGY_REGEN_MS } from './store'
 import Settlement from './components/Settlement'
 import Forest from './components/Forest'
 import Mine from './components/Mine'
@@ -9,15 +9,21 @@ import InventoryScreen from './components/InventoryScreen'
 import CharacterScreen from './components/CharacterScreen'
 import StatsScreen from './components/StatsScreen'
 import Expeditions from './components/Expeditions'
+import Shop from './components/Shop'
 import DevPanel from './components/DevPanel'
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('settlement')
   const [state, setState] = useState<GameState>(loadState)
 
+  useEffect(() => { saveState(state) }, [state])
+
   useEffect(() => {
-    saveState(state)
-  }, [state])
+    const t = setInterval(() => {
+      setState(s => s.energy < MAX_ENERGY ? { ...s, energy: Math.min(MAX_ENERGY, s.energy + 1) } : s)
+    }, ENERGY_REGEN_MS)
+    return () => clearInterval(t)
+  }, [])
 
   function handleReset() {
     setState(resetState())
@@ -32,13 +38,14 @@ export default function App() {
       overflowX: 'hidden', overflowY: 'auto', position: 'relative',
     }}>
       {screen === 'settlement' && (
-        <Settlement inventory={state.inventory} onNavigate={setScreen} />
+        <Settlement onNavigate={setScreen} />
       )}
       {screen === 'forest' && (
         <Forest
           inventory={state.inventory}
           professions={state.professions}
-          onUpdate={(inv, profs) => setState(s => ({ ...s, inventory: inv, professions: profs }))}
+          energy={state.energy}
+          onUpdate={(inv, profs, energyCost = 0) => setState(s => ({ ...s, inventory: inv, professions: profs, energy: Math.max(0, s.energy - energyCost) }))}
           onBack={() => setScreen('settlement')}
         />
       )}
@@ -46,16 +53,16 @@ export default function App() {
         <Mine
           inventory={state.inventory}
           professions={state.professions}
-          onUpdate={(inv, profs) => setState(s => ({ ...s, inventory: inv, professions: profs }))}
+          energy={state.energy}
+          onUpdate={(inv, profs, energyCost = 0) => setState(s => ({ ...s, inventory: inv, professions: profs, energy: Math.max(0, s.energy - energyCost) }))}
           onBack={() => setScreen('settlement')}
         />
       )}
       {screen === 'forge' && (
         <Forge
           inventory={state.inventory}
-          professions={state.professions}
           ownedItems={state.ownedItems}
-          onUpdate={(inv, profs, items) => setState(s => ({ ...s, inventory: inv, professions: profs, ownedItems: items ?? s.ownedItems }))}
+          onUpdate={(inv, items) => setState(s => ({ ...s, inventory: inv, ownedItems: items }))}
           onBack={() => setScreen('settlement')}
         />
       )}
@@ -92,7 +99,16 @@ export default function App() {
           equip={state.equip}
           inventory={state.inventory}
           ownedItems={state.ownedItems}
-          onUpdate={(profs, inv, items) => setState(s => ({ ...s, professions: profs, inventory: inv, ownedItems: items }))}
+          energy={state.energy}
+          onUpdate={(profs, inv, items, energyCost = 0) => setState(s => ({ ...s, professions: profs, inventory: inv, ownedItems: items, energy: Math.max(0, s.energy - energyCost) }))}
+          onBack={() => setScreen('settlement')}
+        />
+      )}
+
+      {screen === 'shop' && (
+        <Shop
+          inventory={state.inventory}
+          onUpdate={inv => setState(s => ({ ...s, inventory: inv }))}
           onBack={() => setScreen('settlement')}
         />
       )}

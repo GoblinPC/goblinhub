@@ -2,74 +2,140 @@ import { useState, useRef, useEffect } from 'react'
 import type { Professions, EquipSlots, Inventory, ItemId } from '../types'
 import { addProfessionXp } from '../store'
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
+// ─── Monster definitions ──────────────────────────────────────────────────────
+
+interface ResourceDrop { item: keyof Inventory; chance: number; amount?: number }
 
 interface MonsterDef {
+  id: string
   name: string
+  emoji: string
   maxHp: number
   attack: number
   defense: number
   xpReward: number
-  emoji: string
-}
-
-interface LootDrop {
-  itemId: ItemId
-  chance: number
-}
-
-interface ExpeditionDef {
-  id: string
-  name: string
-  difficulty: number
-  minLevel: number
-  description: string
-  rewards: string
-  monster: MonsterDef
   goldReward: [number, number]
-  itemDrops: LootDrop[]
+  loot: ResourceDrop[]
+  rarity: string   // display label
+  rarityColor: string
 }
 
-interface RolledLoot {
-  gold: number
-  items: ItemId[]
-}
-
-function rollLoot(exp: ExpeditionDef, ownedItems: ItemId[]): RolledLoot {
-  const gold = exp.goldReward[0] + Math.floor(Math.random() * (exp.goldReward[1] - exp.goldReward[0] + 1))
-  const items: ItemId[] = []
-  for (const drop of exp.itemDrops) {
-    if (!ownedItems.includes(drop.itemId) && Math.random() < drop.chance) {
-      items.push(drop.itemId)
-    }
-  }
-  return { gold, items }
-}
-
-const EXPEDITIONS: ExpeditionDef[] = [
+const MONSTERS: MonsterDef[] = [
   {
-    id: 'cave_mokk',
-    name: 'Jaskinia Mokków',
-    difficulty: 2,
-    minLevel: 1,
-    description: 'Wilgotna jaskinia pełna prymitywnych stworzeń zwanych Mokkami. Potrzeba prawdziwej broni.',
-    rewards: '40 XP + złoto + loot',
-    monster: {
-      name: 'Mokk',
-      maxHp: 25,
-      attack: 6,
-      defense: 3,
-      xpReward: 40,
-      emoji: '🧌',
-    },
-    goldReward: [8, 18],
-    itemDrops: [
-      { itemId: 'club_wooden', chance: 0.4 },
+    id: 'wolf',
+    name: 'Wilk',
+    emoji: '🐺',
+    maxHp: 20,
+    attack: 7,
+    defense: 1,
+    xpReward: 25,
+    goldReward: [4, 10],
+    rarity: 'Pospolity',
+    rarityColor: '#90a870',
+    loot: [
+      { item: 'wolfMeat', chance: 1.0, amount: 1 },
+      { item: 'wolfHide', chance: 0.40 },
+    ],
+  },
+  {
+    id: 'kobold',
+    name: 'Kobold',
+    emoji: '👺',
+    maxHp: 28,
+    attack: 9,
+    defense: 2,
+    xpReward: 35,
+    goldReward: [6, 16],
+    rarity: 'Pospolity',
+    rarityColor: '#90a870',
+    loot: [
+      { item: 'koboldTooth', chance: 1.0, amount: 1 },
+      { item: 'koboldEar',  chance: 0.60 },
+    ],
+  },
+  {
+    id: 'bear',
+    name: 'Niedźwiedź',
+    emoji: '🐻',
+    maxHp: 45,
+    attack: 13,
+    defense: 4,
+    xpReward: 65,
+    goldReward: [10, 22],
+    rarity: 'Rzadki',
+    rarityColor: '#b09050',
+    loot: [
+      { item: 'bearMeat', chance: 1.0, amount: 2 },
+      { item: 'bearClaw', chance: 0.50 },
+    ],
+  },
+  {
+    id: 'troll',
+    name: 'Troll',
+    emoji: '👹',
+    maxHp: 70,
+    attack: 17,
+    defense: 6,
+    xpReward: 110,
+    goldReward: [18, 40],
+    rarity: 'Elitarny',
+    rarityColor: '#a060c0',
+    loot: [
+      { item: 'trollBlood', chance: 1.0, amount: 1 },
+      { item: 'trollHide',  chance: 0.35 },
+      { item: 'trollHeart', chance: 0.08 },
+    ],
+  },
+  {
+    id: 'dragon',
+    name: 'Smok Leśny',
+    emoji: '🐲',
+    maxHp: 110,
+    attack: 24,
+    defense: 10,
+    xpReward: 220,
+    goldReward: [40, 80],
+    rarity: 'Legendarny',
+    rarityColor: '#e07030',
+    loot: [
+      { item: 'dragonMeat',  chance: 1.0, amount: 1 },
+      { item: 'dragonScale', chance: 0.12 },
     ],
   },
 ]
 
+// Spawn weights (sum = 100)
+const SPAWN_TABLE: Array<{ monster: MonsterDef; weight: number }> = [
+  { monster: MONSTERS[0], weight: 30 },  // wolf
+  { monster: MONSTERS[1], weight: 30 },  // kobold
+  { monster: MONSTERS[2], weight: 20 },  // bear
+  { monster: MONSTERS[3], weight: 15 },  // troll
+  { monster: MONSTERS[4], weight: 5  },  // dragon
+]
+
+function rollMonster(): MonsterDef {
+  const total = SPAWN_TABLE.reduce((s, e) => s + e.weight, 0)
+  let r = Math.random() * total
+  for (const entry of SPAWN_TABLE) {
+    r -= entry.weight
+    if (r <= 0) return entry.monster
+  }
+  return MONSTERS[0]
+}
+
+function rollLoot(monster: MonsterDef): Partial<Record<keyof Inventory, number>> {
+  const result: Partial<Record<keyof Inventory, number>> = {}
+  for (const drop of monster.loot) {
+    if (Math.random() < drop.chance) {
+      result[drop.item] = (result[drop.item] ?? 0) + (drop.amount ?? 1)
+    }
+  }
+  return result
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
+
+const EXPEDITION_COST = 20
 
 interface Props {
   characterLevel: number
@@ -77,178 +143,130 @@ interface Props {
   equip: EquipSlots
   inventory: Inventory
   ownedItems: ItemId[]
-  onUpdate: (profs: Professions, inv: Inventory, items: ItemId[]) => void
+  energy: number
+  onUpdate: (profs: Professions, inv: Inventory, items: ItemId[], energyCost?: number) => void
   onBack: () => void
 }
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
-type View = 'list' | 'battle'
+export default function Expeditions({ characterLevel, professions, equip, inventory, ownedItems, energy, onUpdate, onBack }: Props) {
+  const [monster, setMonster] = useState<MonsterDef | null>(null)
 
-export default function Expeditions({ characterLevel, professions, equip, inventory, ownedItems, onUpdate, onBack }: Props) {
-  const [view, setView] = useState<View>('list')
-  const [selected, setSelected] = useState<ExpeditionDef | null>(null)
-
-  function startBattle(exp: ExpeditionDef) {
-    setSelected(exp)
-    setView('battle')
+  function start() {
+    if (energy < EXPEDITION_COST) return
+    setMonster(rollMonster())
   }
 
-  function endBattle(newProfs?: Professions, newInv?: Inventory, newItems?: ItemId[]) {
-    onUpdate(newProfs ?? professions, newInv ?? inventory, newItems ?? ownedItems)
-    setView('list')
-    setSelected(null)
+  function endBattle(newProfs?: Professions, newInv?: Inventory, newItems?: ItemId[], spent?: number) {
+    onUpdate(newProfs ?? professions, newInv ?? inventory, newItems ?? ownedItems, spent)
+    setMonster(null)
   }
 
-  if (view === 'battle' && selected) {
+  if (monster) {
     return (
       <ExpeditionBattle
-        expedition={selected}
+        monster={monster}
         characterLevel={characterLevel}
         professions={professions}
         equip={equip}
         inventory={inventory}
         ownedItems={ownedItems}
         onEnd={endBattle}
-        onBack={() => { setView('list'); setSelected(null) }}
+        onFlee={() => setMonster(null)}
       />
     )
   }
 
-  return (
-    <ExpeditionsList
-      expeditions={EXPEDITIONS}
-      characterLevel={characterLevel}
-      onSelect={startBattle}
-      onBack={onBack}
-    />
-  )
-}
+  const canGo = energy >= EXPEDITION_COST
 
-// ─── Lista wypraw ─────────────────────────────────────────────────────────────
-
-function ExpeditionsList({ expeditions, characterLevel, onSelect, onBack }: {
-  expeditions: ExpeditionDef[]
-  characterLevel: number
-  onSelect: (exp: ExpeditionDef) => void
-  onBack: () => void
-}) {
   return (
     <div className="screen-enter" style={{
-      position: 'relative', width: '100%', height: '100dvh',
+      position: 'relative', width: '100%', height: '100dvh', overflow: 'hidden',
       background: 'radial-gradient(ellipse at 50% 0%, #1a0808 0%, #060304 80%)',
-      display: 'flex', flexDirection: 'column', overflow: 'hidden',
     }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '20px 16px 12px', flexShrink: 0 }}>
-        <button onClick={onBack} style={{
-          background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.15)',
-          borderRadius: 10, color: '#c06050', fontFamily: 'Cinzel', fontSize: 16,
-          width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0,
-        }}>←</button>
-        <div>
-          <h2 style={{ fontFamily: 'Cinzel', fontSize: 20, fontWeight: 700, color: '#e06040', margin: 0, textShadow: '0 0 14px rgba(220,60,30,0.5)' }}>⚔️ Wyprawy</h2>
-          <p style={{ fontFamily: 'Crimson Text', fontSize: 12, color: '#7a4030', margin: '1px 0 0', fontStyle: 'italic' }}>Wybierz wyzwanie dla goblina</p>
+      <img src="/assets/backgrounds/wyprawa.png" alt="" draggable={false}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', pointerEvents: 'none', userSelect: 'none', opacity: 0.35 }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(0,0,0,0.5) 100%)', pointerEvents: 'none' }} />
+
+      <button onClick={onBack} style={{ position: 'absolute', top: 20, left: 16, zIndex: 10, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, color: '#c06050', fontFamily: 'Cinzel', fontSize: 16, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation' }}>←</button>
+
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, zIndex: 1 }}>
+        <button
+          onClick={start}
+          disabled={!canGo}
+          style={{
+            padding: '18px 56px', borderRadius: 14,
+            fontFamily: 'Cinzel', fontSize: 18, fontWeight: 700, letterSpacing: '0.06em',
+            background: canGo ? 'linear-gradient(135deg, #6a1808, #c03020)' : 'rgba(30,10,10,0.7)',
+            border: `1px solid ${canGo ? 'rgba(220,80,50,0.6)' : 'rgba(80,30,20,0.4)'}`,
+            color: canGo ? '#f0a080' : '#603030',
+            cursor: canGo ? 'pointer' : 'not-allowed', touchAction: 'manipulation',
+            boxShadow: canGo ? '0 0 32px rgba(200,50,20,0.5)' : 'none',
+          }}
+        >
+          ⚔ Wyrusz!
+        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontFamily: 'Cinzel', fontSize: 12, color: canGo ? '#806040' : '#803030' }}>
+            Koszt: {EXPEDITION_COST} ⚡
+          </span>
+          <span style={{ fontFamily: 'Cinzel', fontSize: 12, color: canGo ? '#60a030' : '#c03020' }}>
+            {energy}/100
+          </span>
         </div>
-      </div>
 
-      {/* Lista */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 24px' }}>
-        {expeditions.map(exp => {
-          const canEnter = characterLevel >= exp.minLevel
-          return (
-            <div key={exp.id} style={{
-              background: 'rgba(20,8,5,0.85)', border: `1px solid ${canEnter ? 'rgba(200,70,40,0.4)' : 'rgba(80,40,30,0.25)'}`,
-              borderRadius: 16, padding: '16px', marginBottom: 14,
-              backdropFilter: 'blur(6px)',
-            }}>
-              {/* Nagłówek karty */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                <h3 style={{ fontFamily: 'Cinzel', fontSize: 16, fontWeight: 700, color: '#d07050', margin: 0 }}>{exp.name}</h3>
-                <div style={{ display: 'flex', gap: 2, flexShrink: 0, marginLeft: 8 }}>
-                  {Array.from({ length: 5 }, (_, i) => (
-                    <span key={i} style={{ fontSize: 13, color: i < exp.difficulty ? '#e09030' : '#2a1508' }}>★</span>
-                  ))}
-                </div>
-              </div>
-
-              <p style={{ fontFamily: 'Crimson Text', fontSize: 14, color: '#8a5040', margin: '0 0 12px', fontStyle: 'italic', lineHeight: 1.4 }}>
-                {exp.description}
-              </p>
-
-              {/* Przeciwnik + nagroda */}
-              <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-                <div style={{ flex: 1, background: 'rgba(30,10,5,0.6)', borderRadius: 10, padding: '8px 12px', border: '1px solid rgba(120,50,30,0.3)' }}>
-                  <div style={{ fontFamily: 'Cinzel', fontSize: 9, color: '#5a2a18', letterSpacing: '0.1em', marginBottom: 4 }}>PRZECIWNIK</div>
-                  <div style={{ fontFamily: 'Cinzel', fontSize: 13, color: '#c06040' }}>{exp.monster.emoji} {exp.monster.name}</div>
-                  <div style={{ fontFamily: 'Crimson Text', fontSize: 11, color: '#5a3020', marginTop: 2 }}>HP: {exp.monster.maxHp} · ATK: {exp.monster.attack} · DEF: {exp.monster.defense}</div>
-                </div>
-                <div style={{ flex: 1, background: 'rgba(10,20,5,0.6)', borderRadius: 10, padding: '8px 12px', border: '1px solid rgba(60,120,30,0.3)' }}>
-                  <div style={{ fontFamily: 'Cinzel', fontSize: 9, color: '#2a4a18', letterSpacing: '0.1em', marginBottom: 4 }}>NAGRODA</div>
-                  <div style={{ fontFamily: 'Cinzel', fontSize: 13, color: '#60a040' }}>🏆 {exp.rewards}</div>
-                </div>
-              </div>
-
-              <button
-                onClick={() => onSelect(exp)}
-                disabled={!canEnter}
-                style={{
-                  width: '100%', padding: '12px', borderRadius: 12,
-                  fontFamily: 'Cinzel', fontSize: 14, fontWeight: 700, letterSpacing: '0.05em',
-                  cursor: canEnter ? 'pointer' : 'not-allowed', touchAction: 'manipulation',
-                  background: canEnter ? 'linear-gradient(135deg, #6a1808, #c03020)' : 'rgba(30,15,10,0.5)',
-                  border: `1px solid ${canEnter ? 'rgba(220,80,50,0.6)' : 'rgba(60,30,20,0.4)'}`,
-                  color: canEnter ? '#f0a080' : '#3a2015',
-                  boxShadow: canEnter ? '0 0 16px rgba(200,50,20,0.3)' : 'none',
-                }}
-              >
-                {canEnter ? `⚔️ Wyrusz na wyprawę` : `Wymaga poziomu ${exp.minLevel}`}
-              </button>
-            </div>
-          )
-        })}
+        {!canGo && (
+          <span style={{ fontFamily: 'Crimson Text', fontSize: 14, color: '#803020', fontStyle: 'italic' }}>
+            Za mało energii. Odpocznij.
+          </span>
+        )}
       </div>
     </div>
   )
 }
 
-// ─── Walka ────────────────────────────────────────────────────────────────────
+// ─── Battle ───────────────────────────────────────────────────────────────────
 
-type Phase = 'choosing' | 'victory' | 'defeat' | 'fled'
-
-interface BattleState {
-  goblinHp: number
-  monsterHp: number
-  log: string[]
-  phase: Phase
+const ITEM_NAME: Partial<Record<keyof Inventory, string>> = {
+  wolfMeat: 'Mięso wilka', wolfHide: 'Skóra wilka',
+  koboldTooth: 'Ząb kobolda', koboldEar: 'Ucho kobolda',
+  bearMeat: 'Mięso niedźwiedzia', bearClaw: 'Pazur niedźwiedzia',
+  trollBlood: 'Krew trolla', trollHide: 'Skóra trolla', trollHeart: 'Serce trolla',
+  dragonMeat: 'Mięso smoka', dragonScale: '✨ Łuska smoka',
+}
+const ITEM_ICON: Partial<Record<keyof Inventory, string>> = {
+  wolfMeat: '🥩', wolfHide: '🐺', koboldTooth: '🦷', koboldEar: '👂',
+  bearMeat: '🥩', bearClaw: '🐾', trollBlood: '🫙', trollHide: '🛡️',
+  trollHeart: '💜', dragonMeat: '🥩', dragonScale: '🐉',
 }
 
-function ExpeditionBattle({ expedition, characterLevel, professions, equip, inventory, ownedItems, onEnd, onBack }: {
-  expedition: ExpeditionDef
+type Phase = 'choosing' | 'victory' | 'defeat' | 'fled'
+interface BattleState { goblinHp: number; monsterHp: number; log: string[]; phase: Phase }
+
+function ExpeditionBattle({ monster, characterLevel, professions, equip, inventory, ownedItems, onEnd, onFlee }: {
+  monster: MonsterDef
   characterLevel: number
   professions: Professions
   equip: EquipSlots
   inventory: Inventory
   ownedItems: ItemId[]
-  onEnd: (newProfs?: Professions, newInv?: Inventory, newItems?: ItemId[]) => void
-  onBack: () => void
+  onEnd: (newProfs?: Professions, newInv?: Inventory, newItems?: ItemId[], energyCost?: number) => void
+  onFlee: () => void
 }) {
-  const monster = expedition.monster
   const goblinMaxHp = 20 + characterLevel * 5
-  const weaponAtk = equip.weapon ? { sword_copper: 8, club_wooden: 3 }[equip.weapon] ?? 0 : 0
+  const weaponAtk   = equip.weapon ? ({ sword_copper: 8, club_wooden: 3 } as Record<ItemId, number>)[equip.weapon] ?? 0 : 0
   const goblinAttack = 5 + professions.warrior.level * 2 + weaponAtk
   const goblinDefense = 2
-  const [loot, setLoot] = useState<RolledLoot | null>(null)
+
+  const [lootDrops, setLootDrops] = useState<Partial<Record<keyof Inventory, number>> | null>(null)
+  const [goldDrop,  setGoldDrop]  = useState(0)
 
   const [battle, setBattle] = useState<BattleState>({
     goblinHp: goblinMaxHp,
     monsterHp: monster.maxHp,
-    log: [
-      `⚔️ Goblin wkracza do ${expedition.name}!`,
-      `🧌 Naprzeciwko staje ${monster.name}!`,
-      `🎲 Twoja kolej — wybierz akcję.`,
-    ],
+    log: [`${monster.emoji} Napotykasz ${monster.name}!`, `🎲 Twoja kolej.`],
     phase: 'choosing',
   })
 
@@ -257,15 +275,12 @@ function ExpeditionBattle({ expedition, characterLevel, professions, equip, inve
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
   }, [battle.log])
 
-  function monsterTurn(state: BattleState, wasDefending: boolean): BattleState {
+  function monsterTurn(state: BattleState, defending: boolean): BattleState {
     const baseDmg = Math.max(1, monster.attack - goblinDefense)
-    const dmg = wasDefending ? Math.max(1, Math.ceil(baseDmg * 0.5)) : baseDmg
+    const dmg = defending ? Math.max(1, Math.ceil(baseDmg * 0.5)) : baseDmg
     const newHp = Math.max(0, state.goblinHp - dmg)
-    const suffix = wasDefending ? ' (blok!)' : ''
-    const log = [...state.log, `🗡️ ${monster.name} atakuje za ${dmg}${suffix}!`]
-    if (newHp <= 0) {
-      return { ...state, goblinHp: 0, log: [...log, '💀 Goblin pada...', '💔 Porażka!'], phase: 'defeat' }
-    }
+    const log = [...state.log, `🗡️ ${monster.name} zadaje ${dmg} dmg${defending ? ' (blok!)' : ''}!`]
+    if (newHp <= 0) return { ...state, goblinHp: 0, log: [...log, '💀 Goblin pada...'], phase: 'defeat' }
     return { ...state, goblinHp: newHp, log, phase: 'choosing' }
   }
 
@@ -274,12 +289,13 @@ function ExpeditionBattle({ expedition, characterLevel, professions, equip, inve
       if (prev.phase !== 'choosing') return prev
       const dmg = Math.max(1, goblinAttack - monster.defense)
       const newMonsterHp = Math.max(0, prev.monsterHp - dmg)
-      const log = [...prev.log, `⚔️ Goblin uderza za ${dmg} obrażeń!`]
+      const log = [...prev.log, `⚔️ Goblin zadaje ${dmg} dmg!`]
       if (newMonsterHp <= 0) {
-        const rolled = rollLoot(expedition, ownedItems)
-        setLoot(rolled)
-        const lootLines = [`💀 ${monster.name} pokonany!`, `🏆 Zwycięstwo! +${monster.xpReward} XP`, `💰 Złoto: +${rolled.gold}`, ...rolled.items.map(id => `📦 Znaleziono: ${id === 'club_wooden' ? 'Maczuga drewniana' : id}`)]
-        return { ...prev, monsterHp: 0, log: [...log, ...lootLines], phase: 'victory' }
+        const drops = rollLoot(monster)
+        const gold = monster.goldReward[0] + Math.floor(Math.random() * (monster.goldReward[1] - monster.goldReward[0] + 1))
+        setLootDrops(drops)
+        setGoldDrop(gold)
+        return { ...prev, monsterHp: 0, log: [...log, `💀 ${monster.name} pokonany!`, `🏆 +${monster.xpReward} XP · +${gold} 💰`], phase: 'victory' }
       }
       return monsterTurn({ ...prev, monsterHp: newMonsterHp, log }, false)
     })
@@ -289,134 +305,100 @@ function ExpeditionBattle({ expedition, characterLevel, professions, equip, inve
     setBattle(prev => {
       if (prev.phase !== 'choosing') return prev
       if (Math.random() < 0.75) {
-        return { ...prev, log: [...prev.log, '🏃 Goblin ucieka z walki!'], phase: 'fled' }
+        return { ...prev, log: [...prev.log, '🏃 Udało się uciec!'], phase: 'fled' }
       }
-      const log = [...prev.log, '❌ Ucieczka się nie powiodła!']
-      return monsterTurn({ ...prev, log }, false)
+      return monsterTurn({ ...prev, log: [...prev.log, '❌ Ucieczka nieudana!'] }, false)
     })
   }
 
-  function handleVictoryExit() {
+  function handleExit() {
+    if (battle.phase !== 'victory') { onFlee(); return }
     const newProfs = addProfessionXp(professions, 'warrior', monster.xpReward, true)
-    const newInv = { ...inventory, gold: inventory.gold + (loot?.gold ?? 0) }
-    const newItems = [...ownedItems, ...(loot?.items ?? [])]
-    onEnd(newProfs, newInv, newItems)
+    const newInv = { ...inventory, gold: inventory.gold + goldDrop }
+    if (lootDrops) {
+      for (const [key, amount] of Object.entries(lootDrops) as [keyof Inventory, number][]) {
+        (newInv[key] as number) += amount
+      }
+    }
+    onEnd(newProfs, newInv, ownedItems, EXPEDITION_COST)
   }
 
   const { goblinHp, monsterHp, phase, log } = battle
-  const goblinHpPct = Math.max(0, (goblinHp / goblinMaxHp) * 100)
+  const goblinHpPct  = Math.max(0, (goblinHp  / goblinMaxHp)   * 100)
   const monsterHpPct = Math.max(0, (monsterHp / monster.maxHp) * 100)
   const isOver = phase !== 'choosing'
 
   return (
     <div className="screen-enter" style={{ position: 'relative', width: '100%', height: '100dvh', overflow: 'hidden' }}>
-
-      {/* Tło */}
       <img src="/assets/backgrounds/wyprawa.png" alt="" draggable={false}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', userSelect: 'none', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', pointerEvents: 'none' }} />
 
-      {/* Overlay czytelności */}
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.18)', pointerEvents: 'none' }} />
-
-      {/* ── Strefa 1: Nagłówek ── */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0,
-        background: 'linear-gradient(180deg, rgba(4,2,0,0.92) 0%, transparent 100%)',
-        padding: '16px 16px 28px',
-        display: 'flex', alignItems: 'flex-start', gap: 12,
-      }}>
-        <button onClick={onBack} style={{
-          background: 'rgba(0,0,0,0.65)', border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: 10, color: '#c06050', fontFamily: 'Cinzel', fontSize: 16,
-          width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0,
-        }}>←</button>
+      {/* Header */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, background: 'linear-gradient(180deg,rgba(4,2,0,0.92) 0%,transparent 100%)', padding: '16px 16px 28px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <button onClick={onFlee} style={{ background: 'rgba(0,0,0,0.65)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: '#c06050', fontFamily: 'Cinzel', fontSize: 16, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0 }}>←</button>
         <div>
-          <h2 style={{ fontFamily: 'Cinzel', fontSize: 17, fontWeight: 700, color: '#f0a060', margin: 0, textShadow: '0 0 12px rgba(220,80,20,0.6)' }}>{expedition.name}</h2>
-          <div style={{ display: 'flex', gap: 2, marginTop: 3 }}>
-            {Array.from({ length: 5 }, (_, i) => (
-              <span key={i} style={{ fontSize: 11, color: i < expedition.difficulty ? '#e09030' : '#2a1508' }}>★</span>
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 18 }}>{monster.emoji}</span>
+            <h2 style={{ fontFamily: 'Cinzel', fontSize: 17, fontWeight: 700, color: '#f0a060', margin: 0, textShadow: '0 0 12px rgba(220,80,20,0.6)' }}>{monster.name}</h2>
+            <span style={{ fontFamily: 'Cinzel', fontSize: 10, color: monster.rarityColor, background: `${monster.rarityColor}22`, borderRadius: 6, padding: '2px 6px', border: `1px solid ${monster.rarityColor}44` }}>{monster.rarity}</span>
           </div>
         </div>
       </div>
 
-      {/* ── Strefa 2: Pole walki ── */}
+      {/* Monster */}
+      <div style={{ position: 'absolute', top: '17%', right: '14%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+          <div style={{ width: 90, height: 9, background: 'rgba(0,0,0,0.7)', borderRadius: 5, overflow: 'hidden', border: '1px solid rgba(200,60,40,0.35)' }}>
+            <div style={{ height: '100%', width: `${monsterHpPct}%`, background: 'linear-gradient(90deg,#7a0000,#cc2020)', borderRadius: 5, transition: 'width 0.4s' }} />
+          </div>
+          <span style={{ fontFamily: 'Cinzel', fontSize: 10, color: '#c06050' }}>{monsterHp}/{monster.maxHp}</span>
+        </div>
+        <div style={{ width: 78, height: 78, background: 'rgba(25,8,4,0.72)', border: `2px solid ${monsterHp > 0 ? 'rgba(200,60,40,0.55)' : 'rgba(60,20,10,0.4)'}`, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)', fontSize: 44, opacity: monsterHp <= 0 ? 0.2 : 1, transition: 'opacity 0.5s' }}>{monster.emoji}</div>
+      </div>
 
-      {/* Potwór — prawy górny */}
-      <div style={{ position: 'absolute', top: '17%', right: '22%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-        <div>
-          <div style={{ fontFamily: 'Cinzel', fontSize: 12, color: '#e08060', textShadow: '0 1px 6px rgba(0,0,0,0.95)', textAlign: 'right', marginBottom: 4 }}>{monster.name}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
-            <div style={{ width: 88, height: 9, background: 'rgba(0,0,0,0.7)', borderRadius: 5, overflow: 'hidden', border: '1px solid rgba(200,60,40,0.35)' }}>
-              <div style={{ height: '100%', width: `${monsterHpPct}%`, background: 'linear-gradient(90deg,#7a0000,#cc2020)', borderRadius: 5, transition: 'width 0.4s' }} />
+      {/* Goblin */}
+      <div style={{ position: 'absolute', top: '44%', left: '12%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 90, height: 9, background: 'rgba(0,0,0,0.7)', borderRadius: 5, overflow: 'hidden', border: '1px solid rgba(60,160,40,0.35)' }}>
+            <div style={{ height: '100%', width: `${goblinHpPct}%`, background: 'linear-gradient(90deg,#1a5000,#40a020)', borderRadius: 5, transition: 'width 0.4s' }} />
+          </div>
+          <span style={{ fontFamily: 'Cinzel', fontSize: 10, color: '#70a050' }}>{goblinHp}/{goblinMaxHp}</span>
+        </div>
+        <div style={{ width: 78, height: 78, background: 'rgba(5,15,3,0.72)', border: `2px solid ${goblinHp > 0 ? 'rgba(60,160,40,0.55)' : 'rgba(20,40,10,0.4)'}`, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)', fontSize: 44, opacity: goblinHp <= 0 ? 0.2 : 1, transition: 'opacity 0.5s' }}>🧝</div>
+      </div>
+
+      {/* Loot drops (victory) */}
+      {phase === 'victory' && lootDrops && Object.keys(lootDrops).length > 0 && (
+        <div style={{ position: 'absolute', top: '68%', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', maxWidth: 300 }}>
+          {(Object.entries(lootDrops) as [keyof Inventory, number][]).map(([item, qty]) => (
+            <div key={item} className="loot-pop" style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(10,20,5,0.8)', border: '1px solid rgba(80,160,40,0.4)', borderRadius: 10, padding: '6px 12px', backdropFilter: 'blur(4px)' }}>
+              <span style={{ fontSize: 16 }}>{ITEM_ICON[item] ?? '📦'}</span>
+              <span style={{ fontFamily: 'Cinzel', fontSize: 12, color: '#90d050' }}>+{qty}</span>
+              <span style={{ fontFamily: 'Crimson Text', fontSize: 13, color: '#70a040' }}>{ITEM_NAME[item] ?? item}</span>
             </div>
-            <span style={{ fontFamily: 'Cinzel', fontSize: 10, color: '#c06050', textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>{monsterHp}/{monster.maxHp}</span>
-          </div>
+          ))}
         </div>
-        <div style={{
-          width: 76, height: 76,
-          background: 'rgba(25,8,4,0.72)', border: `2px solid ${monsterHp > 0 ? 'rgba(200,60,40,0.55)' : 'rgba(60,20,10,0.4)'}`,
-          borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          backdropFilter: 'blur(4px)', fontSize: 42,
-          boxShadow: monsterHp > 0 ? '0 0 16px rgba(200,40,20,0.35)' : 'none',
-          opacity: monsterHp <= 0 ? 0.25 : 1,
-          transition: 'opacity 0.5s',
-        }}>{monster.emoji}</div>
-      </div>
+      )}
 
-      {/* Goblin — lewy środek-dół */}
-      <div style={{ position: 'absolute', top: '44%', left: '18%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
-        <div>
-          <div style={{ fontFamily: 'Cinzel', fontSize: 12, color: '#80c060', textShadow: '0 1px 6px rgba(0,0,0,0.95)', marginBottom: 4 }}>Goblin</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 88, height: 9, background: 'rgba(0,0,0,0.7)', borderRadius: 5, overflow: 'hidden', border: '1px solid rgba(60,160,40,0.35)' }}>
-              <div style={{ height: '100%', width: `${goblinHpPct}%`, background: 'linear-gradient(90deg,#1a5000,#40a020)', borderRadius: 5, transition: 'width 0.4s' }} />
-            </div>
-            <span style={{ fontFamily: 'Cinzel', fontSize: 10, color: '#70a050', textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>{goblinHp}/{goblinMaxHp}</span>
-          </div>
-        </div>
-        <div style={{
-          width: 76, height: 76,
-          background: 'rgba(5,15,3,0.72)', border: `2px solid ${goblinHp > 0 ? 'rgba(60,160,40,0.55)' : 'rgba(20,40,10,0.4)'}`,
-          borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          backdropFilter: 'blur(4px)', fontSize: 42,
-          boxShadow: goblinHp > 0 ? '0 0 16px rgba(40,160,20,0.3)' : 'none',
-          opacity: goblinHp <= 0 ? 0.25 : 1,
-          transition: 'opacity 0.5s',
-        }}>🧝</div>
-      </div>
-
-      {/* ── Strefa 3+4: Pergamin — log + przyciski ── */}
-      {/* Log na pergaminie */}
-      <div ref={logRef} style={{
-        position: 'absolute', top: '76%', left: '10%', right: '10%',
-        maxHeight: '12%', overflowY: 'auto',
-      }}>
+      {/* Battle log */}
+      <div ref={logRef} style={{ position: 'absolute', top: '76%', left: '8%', right: '8%', maxHeight: '13%', overflowY: 'auto', background: 'rgba(0,0,0,0.55)', borderRadius: 10, padding: '8px 12px', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.07)' }}>
         {log.map((line, i) => (
-          <div key={i} style={{
-            fontFamily: 'Crimson Text', fontSize: 14, lineHeight: 1.5,
-            color: i === log.length - 1 ? '#1a0a02' : '#3a2010',
-            textShadow: '0 1px 3px rgba(0,0,0,0.9)',
-            marginBottom: 2,
-          }}>{line}</div>
+          <div key={i} style={{ fontFamily: 'Crimson Text', fontSize: 15, lineHeight: 1.6, color: i === log.length - 1 ? '#f0e0b0' : '#a08860', textShadow: '0 1px 6px rgba(0,0,0,1)', marginBottom: 1, fontWeight: i === log.length - 1 ? 600 : 400 }}>{line}</div>
         ))}
       </div>
 
-      {/* Przyciski — sam dół pergaminu */}
-      <div style={{
-        position: 'absolute', bottom: '2%', left: 0, right: 0,
-        display: 'flex', justifyContent: 'center', gap: 14,
-      }}>
+      {/* Buttons */}
+      <div style={{ position: 'absolute', bottom: '2%', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 14 }}>
         {!isOver ? (
           <>
-            <SmallBtn label="⚔ Atak" onClick={doAttack} />
-            <SmallBtn label="🏃 Ucieczka" onClick={doFlee} />
+            <SmallBtn label="⚔ Atak"     onClick={doAttack} />
+            <SmallBtn label="🏃 Ucieczka" onClick={doFlee}   />
           </>
         ) : (
           <SmallBtn
-            label={phase === 'victory' ? '🏆 Powrót do osady' : '💔 Powrót do osady'}
-            onClick={phase === 'victory' ? handleVictoryExit : () => onEnd()}
+            label={phase === 'victory' ? '🏆 Wróć do osady' : '💔 Wróć do osady'}
+            onClick={handleExit}
           />
         )}
       </div>
@@ -426,15 +408,7 @@ function ExpeditionBattle({ expedition, characterLevel, professions, equip, inve
 
 function SmallBtn({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} style={{
-      padding: '7px 18px', borderRadius: 8,
-      background: 'rgba(30,18,8,0.7)',
-      border: '1px solid rgba(100,65,25,0.7)',
-      cursor: 'pointer', touchAction: 'manipulation',
-      fontFamily: 'Cinzel', fontSize: 12, fontWeight: 600,
-      color: '#7a4a20', letterSpacing: '0.04em',
-      boxShadow: 'inset 0 1px 0 rgba(200,150,80,0.08)',
-    }}>
+    <button onClick={onClick} style={{ padding: '8px 20px', borderRadius: 8, background: 'rgba(30,18,8,0.75)', border: '1px solid rgba(100,65,25,0.7)', cursor: 'pointer', touchAction: 'manipulation', fontFamily: 'Cinzel', fontSize: 12, fontWeight: 600, color: '#c08040', letterSpacing: '0.04em' }}>
       {label}
     </button>
   )

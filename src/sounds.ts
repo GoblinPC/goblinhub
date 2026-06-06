@@ -17,8 +17,8 @@ let hoverAudio: HTMLAudioElement | null = null
 export function playHoverPreview(type: 'forge' | 'mine' | 'forest') {
   cutHoverPreview()
   const src = {
-    forge:  '/assets/sound/campfire_ambient.mp3',
-    mine:   '/assets/sound/Mining.mp3',
+    forge:  '/assets/sound/Mining.mp3',
+    mine:   '/assets/sound/campfire_ambient.mp3',
     forest: '/assets/sound/Choping.mp3',
   }[type]
   hoverAudio = new Audio(src)

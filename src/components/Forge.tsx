@@ -1,226 +1,249 @@
-import { useEffect } from 'react'
-import type { Inventory, Professions, ItemId } from '../types'
-import { playSmithing, startForgeAmbience, stopForgeAmbience } from '../sounds'
-import { addProfessionXp, xpProgress, xpToNextLevel, xpForLevel } from '../store'
+import { useState, useEffect } from 'react'
+import type { Inventory, ItemId, EquipSlots } from '../types'
+import { startForgeAmbience, stopForgeAmbience } from '../sounds'
 
-// Iskry lecące w górę z paleniska
-const EMBERS = [
-  { left: '18%', delay: '0s',   dur: '2.2s', size: 4 },
-  { left: '22%', delay: '0.4s', dur: '1.8s', size: 3 },
-  { left: '15%', delay: '0.8s', dur: '2.5s', size: 5 },
-  { left: '25%', delay: '1.3s', dur: '2s',   size: 3 },
-  { left: '20%', delay: '1.7s', dur: '2.3s', size: 4 },
-  { left: '12%', delay: '2.1s', dur: '1.9s', size: 3 },
-  { left: '28%', delay: '0.6s', dur: '2.6s', size: 4 },
+// ─── Shop data ────────────────────────────────────────────────────────────────
+
+interface Tier {
+  id: ItemId
+  label: string
+  buy?: Partial<Record<keyof Inventory, number>>   // cost to buy (tier 1 only)
+  upg?: Partial<Record<keyof Inventory, number>>   // cost to upgrade from previous tier
+  atk?: number
+  def?: number
+}
+
+interface ShopEntry {
+  base: string
+  name: string
+  slot: keyof EquipSlots
+  emoji: string
+  tiers: [Tier, Tier, Tier]
+}
+
+const SHOP: ShopEntry[] = [
+  {
+    base: 'sword', name: 'Miecz', slot: 'weapon', emoji: '⚔️',
+    tiers: [
+      { id: 'sword_copper',  label: 'Miedziany', buy: { gold: 30 },     atk: 5  },
+      { id: 'sword_iron',    label: 'Żelazny',   upg: { ironBar: 3 },   atk: 10 },
+      { id: 'sword_diamond', label: 'Diamentowy',upg: { diamond: 2 },   atk: 18 },
+    ],
+  },
+  {
+    base: 'axe', name: 'Topór', slot: 'weapon', emoji: '🪓',
+    tiers: [
+      { id: 'axe_copper',  label: 'Miedziany', buy: { gold: 25 },     atk: 4  },
+      { id: 'axe_iron',    label: 'Żelazny',   upg: { ironBar: 2 },   atk: 8  },
+      { id: 'axe_diamond', label: 'Diamentowy',upg: { diamond: 1 },   atk: 14 },
+    ],
+  },
+  {
+    base: 'shield', name: 'Tarcza', slot: 'shield', emoji: '🛡️',
+    tiers: [
+      { id: 'shield_copper',  label: 'Miedziana', buy: { gold: 20 },     def: 4  },
+      { id: 'shield_iron',    label: 'Żelazna',   upg: { ironBar: 2 },   def: 8  },
+      { id: 'shield_diamond', label: 'Diamentowa',upg: { diamond: 1 },   def: 14 },
+    ],
+  },
+  {
+    base: 'armor', name: 'Kolczuga', slot: 'armor', emoji: '🔗',
+    tiers: [
+      { id: 'armor_copper',  label: 'Miedziana', buy: { gold: 40 },     def: 6  },
+      { id: 'armor_iron',    label: 'Żelazna',   upg: { ironBar: 4 },   def: 12 },
+      { id: 'armor_diamond', label: 'Diamentowa',upg: { diamond: 3 },   def: 20 },
+    ],
+  },
 ]
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Props {
   inventory: Inventory
-  professions: Professions
   ownedItems: ItemId[]
-  onUpdate: (inv: Inventory, profs: Professions, items?: ItemId[]) => void
+  onUpdate: (inv: Inventory, items: ItemId[]) => void
   onBack: () => void
 }
 
-export default function Forge({ inventory, professions, ownedItems, onUpdate, onBack }: Props) {
-  useEffect(() => {
-    startForgeAmbience()
-    return () => stopForgeAmbience()
-  }, [])
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-  const prof = professions.blacksmith
-  const xpPct = xpProgress(prof.xp, prof.level) * 100
-  const xpNeeded = xpToNextLevel(prof.level)
+function canAfford(inv: Inventory, cost: Partial<Record<keyof Inventory, number>>): boolean {
+  return Object.entries(cost).every(([k, v]) => (inv[k as keyof Inventory] as number) >= (v ?? 0))
+}
 
-  const canLight = inventory.wood >= 1
-  const canSmelt = inventory.forgeEmber >= 1 && inventory.copperOre >= 2
-  const canCraftSword = inventory.copperBar >= 1 && inventory.wood >= 1
-  const hasSword = ownedItems.includes('sword_copper')
+function deduct(inv: Inventory, cost: Partial<Record<keyof Inventory, number>>): Inventory {
+  const next = { ...inv }
+  for (const [k, v] of Object.entries(cost)) {
+    ;(next[k as keyof Inventory] as number) -= v ?? 0
+  }
+  return next
+}
 
-  function handleLight() {
-    if (!canLight) return
-    playSmithing()
-    const newProfs = addProfessionXp(professions, 'blacksmith', 10)
-    onUpdate({ ...inventory, wood: inventory.wood - 1, forgeEmber: inventory.forgeEmber + 1 }, newProfs)
+function ownedTier(entry: ShopEntry, ownedItems: ItemId[]): 0 | 1 | 2 | 3 {
+  if (ownedItems.includes(entry.tiers[2].id)) return 3
+  if (ownedItems.includes(entry.tiers[1].id)) return 2
+  if (ownedItems.includes(entry.tiers[0].id)) return 1
+  return 0
+}
+
+function ownedId(entry: ShopEntry, ownedItems: ItemId[]): ItemId | null {
+  const t = ownedTier(entry, ownedItems)
+  return t > 0 ? entry.tiers[t - 1].id : null
+}
+
+function costLabel(cost: Partial<Record<keyof Inventory, number>>): string {
+  const MAP: Partial<Record<keyof Inventory, string>> = {
+    gold: '💰', copperBar: '🔶', ironBar: '⚙️', diamond: '💎',
+  }
+  return Object.entries(cost).map(([k, v]) => `${MAP[k as keyof Inventory] ?? k} ${v}`).join(' ')
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
+export default function Forge({ inventory, ownedItems, onUpdate, onBack }: Props) {
+  const [tab, setTab] = useState<'weapons' | 'armor'>('weapons')
+
+  useEffect(() => { startForgeAmbience(); return () => stopForgeAmbience() }, [])
+
+  function handleBuy(entry: ShopEntry) {
+    const cost = entry.tiers[0].buy!
+    if (!canAfford(inventory, cost)) return
+    const newInv = deduct(inventory, cost)
+    onUpdate(newInv, [...ownedItems, entry.tiers[0].id])
   }
 
-  function handleSmelt() {
-    if (!canSmelt) return
-    playSmithing()
-    const newProfs = addProfessionXp(professions, 'blacksmith', 25)
-    onUpdate({
-      ...inventory,
-      forgeEmber: inventory.forgeEmber - 1,
-      copperOre: inventory.copperOre - 2,
-      copperBar: inventory.copperBar + 1,
-    }, newProfs)
+  function handleUpgrade(entry: ShopEntry) {
+    const tier = ownedTier(entry, ownedItems)
+    if (tier === 0 || tier === 3) return
+    const nextTier = entry.tiers[tier] // tier is 1 or 2, so index = tier (0-based next)
+    const cost = nextTier.upg!
+    if (!canAfford(inventory, cost)) return
+    const newInv = deduct(inventory, cost)
+    const prevId = ownedId(entry, ownedItems)!
+    const newItems = ownedItems.filter(x => x !== prevId).concat(nextTier.id)
+    onUpdate(newInv, newItems)
   }
 
-  function handleCraftSword() {
-    if (!canCraftSword || hasSword) return
-    playSmithing()
-    const newProfs = addProfessionXp(professions, 'blacksmith', 50)
-    onUpdate(
-      { ...inventory, copperBar: inventory.copperBar - 1, wood: inventory.wood - 1 },
-      newProfs,
-      [...ownedItems, 'sword_copper'],
-    )
-  }
+  const weapons = SHOP.filter(e => e.base === 'sword' || e.base === 'axe')
+  const armors  = SHOP.filter(e => e.base === 'shield' || e.base === 'armor')
+  const shown   = tab === 'weapons' ? weapons : armors
 
   return (
-    <div className="screen-enter" style={{ position: 'relative', width: '100%', height: '100dvh', overflow: 'hidden' }}>
+    <div style={{ position: 'relative', width: '100%', minHeight: '100dvh', background: '#0c0806' }}>
 
-      {/* Tło */}
       <img src="/assets/backgrounds/forge.webp" alt="" draggable={false}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', pointerEvents: 'none', userSelect: 'none' }} />
+        style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', pointerEvents: 'none', userSelect: 'none', zIndex: 0 }} />
 
-      {/* Wielki glow paleniska */}
-      <div style={{
-        position: 'absolute', left: '20%', top: '36%', width: '28%', height: '14%',
-        transform: 'translate(-50%, 0)',
-        borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(255,140,20,0.7) 0%, rgba(255,80,10,0.3) 50%, transparent 75%)',
-        filter: 'blur(10px)', pointerEvents: 'none', mixBlendMode: 'screen',
-        animation: 'ambiForge 1.8s ease-in-out infinite',
-      }} />
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(8,4,2,0.72)', zIndex: 1, pointerEvents: 'none' }} />
 
-      {/* Żarzące węgle – dolne palenisko */}
-      <div style={{
-        position: 'absolute', left: '20%', top: '50%', width: '20%', height: '7%',
-        transform: 'translate(-50%, 0)',
-        borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(255,80,10,0.6) 0%, transparent 70%)',
-        filter: 'blur(8px)', pointerEvents: 'none', mixBlendMode: 'screen',
-        animation: 'ambiForge 2.4s ease-in-out 0.3s infinite',
-      }} />
+      <div style={{ position: 'relative', zIndex: 2, padding: '20px 16px 40px' }}>
 
-      {/* Żyrandol */}
-      <div style={{
-        position: 'absolute', left: '58%', top: '8%', width: '16%', height: '7%',
-        transform: 'translate(-50%, 0)',
-        borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(255,200,80,0.5) 0%, transparent 70%)',
-        filter: 'blur(8px)', pointerEvents: 'none', mixBlendMode: 'screen',
-        animation: 'ambiLantern 2.5s ease-in-out 0.6s infinite',
-      }} />
-
-      {/* Latarnia przy drzwiach */}
-      <div style={{
-        position: 'absolute', left: '51%', top: '50%',
-        width: '10px', height: '10px', borderRadius: '50%',
-        transform: 'translate(-50%, -50%)',
-        background: 'rgba(255,200,100,0.9)', boxShadow: '0 0 14px 7px rgba(255,180,60,0.5)',
-        pointerEvents: 'none', mixBlendMode: 'screen',
-        animation: 'ambiLantern 1.6s ease-in-out 0.9s infinite',
-      }} />
-
-      {/* Iskry z paleniska */}
-      {EMBERS.map((e, i) => (
-        <div key={i} style={{
-          position: 'absolute', left: e.left, top: '48%',
-          width: e.size + 'px', height: e.size + 'px', borderRadius: '50%',
-          background: i % 2 === 0 ? 'rgba(255,160,40,0.95)' : 'rgba(255,100,20,0.9)',
-          boxShadow: '0 0 4px 2px rgba(255,120,20,0.4)',
-          pointerEvents: 'none', mixBlendMode: 'screen',
-          animation: `emberRise ${e.dur} ease-out ${e.delay} infinite`,
-          transform: 'translate(-50%, -50%)',
-        }} />
-      ))}
-
-      {/* Ciepła poświata całości */}
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 22% 45%, rgba(180,60,10,0.12) 0%, transparent 55%)', pointerEvents: 'none' }} />
-
-      {/* Gradient góra */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '120px',
-        background: 'linear-gradient(180deg, rgba(10,4,2,0.88) 0%, transparent 100%)', pointerEvents: 'none' }} />
-
-      {/* Header */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', alignItems: 'center', gap: '12px', padding: '20px 16px 0' }}>
-        <BackBtn onClick={onBack} />
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: '22px' }}>⚒️</span>
-            <h2 style={{ fontFamily: 'Cinzel', fontSize: '20px', fontWeight: 700, color: '#f0c060', margin: 0, textShadow: '0 0 16px rgba(240,140,20,0.6)' }}>Kuźnia</h2>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+          <button onClick={onBack} style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,200,80,0.15)', borderRadius: 10, color: '#8a6040', fontFamily: 'Cinzel', fontSize: 16, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation' }}>←</button>
+          <div>
+            <h2 style={{ fontFamily: 'Cinzel', fontSize: 20, fontWeight: 700, color: '#f0c060', margin: 0, textShadow: '0 0 16px rgba(240,140,20,0.6)' }}>⚒️ Kuźnia</h2>
+            <p style={{ fontFamily: 'Crimson Text', fontSize: 13, color: '#a07050', margin: '2px 0 0', fontStyle: 'italic' }}>Kup ekwipunek i ulepszaj go</p>
           </div>
-          <p style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#d0a070', margin: '2px 0 0', fontStyle: 'italic', textShadow: '0 1px 6px rgba(0,0,0,0.95)' }}>Gorące palenisko goblinich kowali</p>
+          <div style={{ marginLeft: 'auto', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(200,160,40,0.25)', borderRadius: 8, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontFamily: 'Cinzel', fontSize: 13, color: '#d4a030' }}>💰 {inventory.gold} złota</span>
+          </div>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.55)', borderRadius: 6, padding: '2px 6px', backdropFilter: 'blur(4px)' }}>
-            <span style={{ fontFamily: 'Cinzel', fontSize: '10px', color: '#d09050', textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>🔨 lv.{prof.level}</span>
-            <div style={{ width: 55, height: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 2, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${xpPct}%`, background: 'linear-gradient(90deg,#8a4010,#e08030)', borderRadius: 2, boxShadow: '0 0 4px rgba(220,120,30,0.5)', transition: 'width 0.3s' }} />
+
+        {/* Zasoby */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
+          {[
+            { icon: '🔶', label: 'Miedź', val: inventory.copperBar },
+            { icon: '⚙️',  label: 'Żelazo', val: inventory.ironBar },
+            { icon: '💎', label: 'Diament', val: inventory.diamond },
+          ].map(r => (
+            <div key={r.label} style={{ background: 'rgba(0,0,0,0.55)', border: `1px solid ${r.val > 0 ? 'rgba(200,150,40,0.3)' : 'rgba(40,30,10,0.4)'}`, borderRadius: 8, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 14 }}>{r.icon}</span>
+              <span style={{ fontFamily: 'Cinzel', fontSize: 12, color: r.val > 0 ? '#c0a040' : '#4a3010' }}>{r.val}</span>
+              <span style={{ fontFamily: 'Crimson Text', fontSize: 10, color: '#604020' }}>{r.label}</span>
             </div>
-            <span style={{ fontFamily: 'Cinzel', fontSize: '9px', color: '#b07040' }}>{prof.xp - xpForLevel(prof.level)}/{xpNeeded}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Panel akcji – dół */}
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
-        background: 'linear-gradient(0deg, rgba(10,4,2,0.98) 0%, rgba(15,6,2,0.93) 55%, transparent 100%)',
-        padding: '12px 16px 32px' }}>
-
-        {/* Surowce */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', justifyContent: 'center' }}>
-          <ResourceChip icon="🪵" label="Drewno" amount={inventory.wood} color="#a07840" />
-          <ResourceChip icon="🪨" label="Ruda" amount={inventory.copperOre} color="#c07850" />
-          <ResourceChip icon="🔥" label="Żar" amount={inventory.forgeEmber} color="#f06020" />
-          <ResourceChip icon="🔶" label="Sztabka" amount={inventory.copperBar} color="#e09050" />
+          ))}
         </div>
 
-        {/* Akcja 1 */}
-        <div style={{ marginBottom: '10px' }}>
-          <p style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#6a4830', margin: '0 0 6px', fontStyle: 'italic', textAlign: 'center' }}>
-            🪵 Drewno ×1 → 🔥 Żar ×1
-          </p>
-          <button className="btn-primary" onClick={handleLight} disabled={!canLight}>
-            {canLight ? '⚗️ Rozpal piec' : 'Potrzebujesz drewna'}
-          </button>
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          {(['weapons', 'armor'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontFamily: 'Cinzel', fontSize: 12, fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', background: tab === t ? 'rgba(160,100,20,0.7)' : 'rgba(0,0,0,0.5)', border: `1px solid ${tab === t ? 'rgba(200,140,40,0.5)' : 'rgba(60,40,10,0.4)'}`, color: tab === t ? '#f0c060' : '#605030' }}>
+              {t === 'weapons' ? '⚔️ Broń' : '🛡️ Zbroja'}
+            </button>
+          ))}
         </div>
 
-        {/* Akcja 2 */}
-        <div style={{ marginBottom: '10px' }}>
-          <p style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#506030', margin: '0 0 6px', fontStyle: 'italic', textAlign: 'center' }}>
-            🔥 Żar ×1 + 🪨 Ruda ×2 → 🔶 Sztabka ×1
-          </p>
-          <button className="btn-secondary" onClick={handleSmelt} disabled={!canSmelt}>
-            {canSmelt ? '🔥 Przetop rudę miedzi' : 'Niewystarczające zasoby'}
-          </button>
+        {/* Items */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {shown.map(entry => {
+            const tier = ownedTier(entry, ownedItems)
+            const curTier = tier > 0 ? entry.tiers[tier - 1] : null
+            const nextTier = tier < 3 ? entry.tiers[tier as 0 | 1 | 2] : null
+            const buyable = tier === 0 && canAfford(inventory, entry.tiers[0].buy!)
+            const upgradeable = tier > 0 && tier < 3 && canAfford(inventory, nextTier!.upg!)
+
+            return (
+              <div key={entry.base} style={{ background: 'rgba(0,0,0,0.6)', border: `1px solid ${tier > 0 ? 'rgba(200,150,40,0.35)' : 'rgba(50,35,10,0.4)'}`, borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+
+                {/* Icon + tier dots */}
+                <div style={{ textAlign: 'center', flexShrink: 0, width: 44 }}>
+                  <div style={{ fontSize: 26 }}>{entry.emoji}</div>
+                  <div style={{ display: 'flex', gap: 3, justifyContent: 'center', marginTop: 4 }}>
+                    {[1,2,3].map(t => (
+                      <div key={t} style={{ width: 7, height: 7, borderRadius: '50%', background: t <= tier ? (t === 3 ? '#60e8ff' : t === 2 ? '#a0a0d0' : '#e09030') : 'rgba(255,255,255,0.12)' }} />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: 'Cinzel', fontSize: 14, fontWeight: 700, color: tier > 0 ? '#e0c070' : '#706040' }}>
+                    {entry.name}
+                    {curTier && <span style={{ fontFamily: 'Crimson Text', fontSize: 11, color: '#806030', marginLeft: 6 }}>{curTier.label}</span>}
+                  </div>
+                  <div style={{ fontFamily: 'Crimson Text', fontSize: 11, color: '#908060', marginTop: 2 }}>
+                    {(curTier ?? entry.tiers[0]).atk ? `⚔ ATK +${(curTier ?? entry.tiers[0]).atk}` : ''}
+                    {(curTier ?? entry.tiers[0]).def ? `🛡 DEF +${(curTier ?? entry.tiers[0]).def}` : ''}
+                  </div>
+                  {tier === 0 && (
+                    <div style={{ fontFamily: 'Crimson Text', fontSize: 11, color: '#605030', marginTop: 2 }}>
+                      Koszt: {costLabel(entry.tiers[0].buy!)}
+                    </div>
+                  )}
+                  {tier > 0 && tier < 3 && (
+                    <div style={{ fontFamily: 'Crimson Text', fontSize: 11, color: '#605040', marginTop: 2 }}>
+                      Ulepsz → {nextTier!.label}: {costLabel(nextTier!.upg!)}
+                    </div>
+                  )}
+                  {tier === 3 && (
+                    <div style={{ fontFamily: 'Crimson Text', fontSize: 11, color: '#40a0b0', marginTop: 2, fontStyle: 'italic' }}>Maksymalny poziom</div>
+                  )}
+                </div>
+
+                {/* Action */}
+                {tier === 0 && (
+                  <button onClick={() => handleBuy(entry)} disabled={!buyable}
+                    style={{ flexShrink: 0, padding: '7px 14px', borderRadius: 8, fontFamily: 'Cinzel', fontSize: 11, fontWeight: 700, cursor: buyable ? 'pointer' : 'not-allowed', touchAction: 'manipulation', background: buyable ? 'rgba(60,40,5,0.9)' : 'rgba(20,15,5,0.5)', border: `1px solid ${buyable ? 'rgba(180,120,20,0.6)' : 'rgba(40,30,10,0.3)'}`, color: buyable ? '#d09030' : '#403020', whiteSpace: 'nowrap' }}>
+                    Kup
+                  </button>
+                )}
+                {tier > 0 && tier < 3 && (
+                  <button onClick={() => handleUpgrade(entry)} disabled={!upgradeable}
+                    style={{ flexShrink: 0, padding: '7px 10px', borderRadius: 8, fontFamily: 'Cinzel', fontSize: 11, fontWeight: 700, cursor: upgradeable ? 'pointer' : 'not-allowed', touchAction: 'manipulation', background: upgradeable ? 'rgba(10,40,60,0.9)' : 'rgba(10,20,30,0.5)', border: `1px solid ${upgradeable ? 'rgba(60,140,200,0.6)' : 'rgba(20,50,80,0.3)'}`, color: upgradeable ? '#60c0e0' : '#304050', whiteSpace: 'nowrap' }}>
+                    Ulepsz
+                  </button>
+                )}
+                {tier === 3 && (
+                  <span style={{ fontFamily: 'Cinzel', fontSize: 11, color: '#40b0c0', flexShrink: 0 }}>✦ MAX</span>
+                )}
+              </div>
+            )
+          })}
         </div>
 
-        {/* Akcja 3 – Miecz miedziany */}
-        <div style={{ borderTop: '1px solid rgba(200,140,40,0.15)', paddingTop: '10px' }}>
-          <p style={{ fontFamily: 'Crimson Text', fontSize: '13px', color: '#806030', margin: '0 0 6px', fontStyle: 'italic', textAlign: 'center' }}>
-            🔶 Sztabka ×1 + 🪵 Drewno ×1 → ⚔️ Miecz miedziany
-          </p>
-          <button className="btn-primary" onClick={handleCraftSword} disabled={!canCraftSword || hasSword}
-            style={{ background: canCraftSword && !hasSword ? 'linear-gradient(135deg, #6a3010, #b05020)' : undefined, borderColor: canCraftSword && !hasSword ? '#d07030' : undefined }}>
-            {hasSword ? 'Już posiadasz miecz' : canCraftSword ? '⚔️ Wykuj miecz miedziany' : 'Potrzebujesz sztabki i drewna'}
-          </button>
-        </div>
       </div>
     </div>
-  )
-}
-
-function ResourceChip({ icon, label, amount, color }: { icon: string; label: string; amount: number; color: string }) {
-  return (
-    <div style={{
-      background: 'rgba(0,0,0,0.6)', border: `1px solid ${amount > 0 ? color + '55' : '#2a1a0a'}`,
-      borderRadius: '10px', padding: '6px 10px', textAlign: 'center', minWidth: '60px',
-      backdropFilter: 'blur(4px)',
-    }}>
-      <div style={{ fontSize: '18px', lineHeight: 1, marginBottom: '2px' }}>{icon}</div>
-      <div style={{ fontFamily: 'Cinzel', fontSize: '16px', fontWeight: 700, color: amount > 0 ? color : '#3a2810', lineHeight: 1 }}>{amount}</div>
-      <div style={{ fontFamily: 'Crimson Text', fontSize: '10px', color: '#4a3020', letterSpacing: '0.03em' }}>{label}</div>
-    </div>
-  )
-}
-
-function BackBtn({ onClick }: { onClick: () => void }) {
-  return (
-    <button onClick={onClick} style={{
-      background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,200,80,0.15)',
-      borderRadius: '10px', color: '#8a6040', fontFamily: 'Cinzel', fontSize: '16px',
-      width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation', backdropFilter: 'blur(4px)',
-    }}>←</button>
   )
 }

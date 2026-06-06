@@ -283,6 +283,64 @@ body {
   100% { opacity: 0;   transform: translate(-50%,-50%) translateY(-100px) scale(0.3) translateX(12px); }
 }
 
+/* ─── Mine minigame ──────────────────────────────────────────────────────── */
+
+.rock-shake {
+  animation: rockShake 0.28s ease-in-out;
+}
+
+@keyframes rockShake {
+  0%, 100% { transform: translateX(0)    translateY(0); }
+  20%       { transform: translateX(-7px) translateY(-3px); }
+  40%       { transform: translateX(7px)  translateY(2px); }
+  60%       { transform: translateX(-4px) translateY(-2px); }
+  80%       { transform: translateX(4px)  translateY(1px); }
+}
+
+/* Orbit paths – points positioned at left:50% top:50% of rock */
+@keyframes mineOrbitA {
+  0%   { transform: translate(calc(-50% + 44px), calc(-50% + 8px)); }
+  25%  { transform: translate(calc(-50% - 8px),  calc(-50% - 34px)); }
+  50%  { transform: translate(calc(-50% - 44px), calc(-50% + 5px)); }
+  75%  { transform: translate(calc(-50% + 6px),  calc(-50% + 34px)); }
+  100% { transform: translate(calc(-50% + 44px), calc(-50% + 8px)); }
+}
+@keyframes mineOrbitB {
+  0%   { transform: translate(calc(-50% - 44px), calc(-50% - 5px)); }
+  25%  { transform: translate(calc(-50% + 10px), calc(-50% + 33px)); }
+  50%  { transform: translate(calc(-50% + 43px), calc(-50% - 8px)); }
+  75%  { transform: translate(calc(-50% - 8px),  calc(-50% - 32px)); }
+  100% { transform: translate(calc(-50% - 44px), calc(-50% - 5px)); }
+}
+
+/* Hot moment ring */
+@keyframes mineHotRing {
+  0%   { transform: translate(-50%, -50%) scale(1);   opacity: 0.8; }
+  100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+}
+
+/* Peak ripple ring */
+@keyframes peakRipple {
+  0%   { transform: translate(-50%, -50%) scale(0.92); opacity: 0.9; }
+  100% { transform: translate(-50%, -50%) scale(1.35); opacity: 0; }
+}
+
+@keyframes woodChip {
+  0%   { opacity: 1; transform: translate(0, 0) rotate(0deg); }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(280deg); }
+}
+
+@keyframes labelFloat {
+  0%   { opacity: 0; transform: translateY(0px); }
+  15%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-32px); }
+}
+
+@keyframes sparkFly {
+  0%   { opacity: 1; transform: translate(-50%, -50%) scale(1.4); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0); }
+}
+
 /* ─── Hotspot buttons ────────────────────────────────────────────────────── */
 
 .hotspot-btn {

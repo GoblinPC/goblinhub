@@ -5,11 +5,26 @@ import type { Inventory, Professions, ProfessionKey, ProfessionStats, GameState,
 const DEFAULT_INVENTORY: Inventory = {
   gold: 0,
   wood: 0,
+  stone: 0,
   copperOre: 0,
+  ironOre: 0,
+  diamond: 0,
   copperBar: 0,
+  ironBar: 0,
   forgeEmber: 0,
   herbs: 0,
   fish: 0,
+  wolfMeat: 0,
+  wolfHide: 0,
+  koboldTooth: 0,
+  koboldEar: 0,
+  bearMeat: 0,
+  bearClaw: 0,
+  trollBlood: 0,
+  trollHide: 0,
+  trollHeart: 0,
+  dragonMeat: 0,
+  dragonScale: 0,
 }
 
 const DEFAULT_EQUIP: EquipSlots = {
@@ -111,7 +126,8 @@ export function loadState(): GameState {
     const tools = { ...DEFAULT_TOOLS, ...(parsed.tools ?? {}) }
     const ownedItems = parsed.ownedItems ?? []
     const { xp, level } = calcCharacterLevel(professions)
-    return { inventory, professions, characterXp: xp, characterLevel: level, equip, tools, ownedItems }
+    const energy = typeof parsed.energy === 'number' ? Math.min(parsed.energy, 100) : 100
+    return { inventory, professions, characterXp: xp, characterLevel: level, equip, tools, ownedItems, energy }
   } catch {
     return makeDefault()
   }
@@ -124,8 +140,12 @@ export function saveState(state: GameState): void {
     equip: state.equip,
     tools: state.tools,
     ownedItems: state.ownedItems,
+    energy: state.energy,
   }))
 }
+
+export const MAX_ENERGY = 100
+export const ENERGY_REGEN_MS = 6000   // 1 energy co 6s → pełny od 0 w 10 min
 
 export function makeDefault(): GameState {
   const professions = DEFAULT_PROFESSIONS()
@@ -137,6 +157,7 @@ export function makeDefault(): GameState {
     equip: { ...DEFAULT_EQUIP },
     tools: { ...DEFAULT_TOOLS },
     ownedItems: [],
+    energy: MAX_ENERGY,
   }
 }
 

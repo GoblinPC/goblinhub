@@ -16,18 +16,19 @@ export const ITEM_META: Record<ItemId, {
   atk?: number
   def?: number
 }> = {
-  sword_copper: {
-    label: 'Miecz miedziany',
-    image: '/assets/backgrounds/sword.png',
-    slots: ['weapon'],
-    atk: 8,
-  },
-  club_wooden: {
-    label: 'Maczuga drewniana',
-    image: '/assets/backgrounds/sword.png',
-    slots: ['weapon'],
-    atk: 3,
-  },
+  sword_copper:  { label: 'Miecz miedziany',    image: '/assets/backgrounds/sword.png', slots: ['weapon'], atk: 5  },
+  sword_iron:    { label: 'Miecz żelazny',      image: '/assets/backgrounds/sword.png', slots: ['weapon'], atk: 10 },
+  sword_diamond: { label: 'Miecz diamentowy',   image: '/assets/backgrounds/sword.png', slots: ['weapon'], atk: 18 },
+  axe_copper:    { label: 'Topór miedziany',    image: '/assets/backgrounds/sword.png', slots: ['weapon'], atk: 4  },
+  axe_iron:      { label: 'Topór żelazny',      image: '/assets/backgrounds/sword.png', slots: ['weapon'], atk: 8  },
+  axe_diamond:   { label: 'Topór diamentowy',   image: '/assets/backgrounds/sword.png', slots: ['weapon'], atk: 14 },
+  shield_copper: { label: 'Tarcza miedziana',   image: '/assets/backgrounds/sword.png', slots: ['shield'], def: 4  },
+  shield_iron:   { label: 'Tarcza żelazna',     image: '/assets/backgrounds/sword.png', slots: ['shield'], def: 8  },
+  shield_diamond:{ label: 'Tarcza diamentowa',  image: '/assets/backgrounds/sword.png', slots: ['shield'], def: 14 },
+  armor_copper:  { label: 'Kolczuga miedziana', image: '/assets/backgrounds/sword.png', slots: ['armor'],  def: 6  },
+  armor_iron:    { label: 'Kolczuga żelazna',   image: '/assets/backgrounds/sword.png', slots: ['armor'],  def: 12 },
+  armor_diamond: { label: 'Kolczuga diamentowa',image: '/assets/backgrounds/sword.png', slots: ['armor'],  def: 20 },
+  club_wooden:   { label: 'Maczuga drewniana',  image: '/assets/backgrounds/sword.png', slots: ['weapon'], atk: 3  },
 }
 
 const EQUIP_SLOTS: { key: keyof EquipSlots; label: string; icon: string }[] = [

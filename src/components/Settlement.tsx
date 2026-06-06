@@ -25,9 +25,9 @@ export interface Light {
 
 const LIGHT_ANIM_CSS: Record<Light['anim'], string> = {
   none:    'none',
-  pulse:   'ambiForge 2s ease-in-out infinite',
-  flicker: 'ambiForge 0.55s ease-in-out infinite',
-  blink:   'fireflyBlink 1.2s ease-in-out infinite',
+  pulse:   'lightPulse 2s ease-in-out infinite',
+  flicker: 'lightPulse 0.55s ease-in-out infinite',
+  blink:   'lightBlink 1.2s ease-in-out infinite',
 }
 
 const COLOR_PRESETS = [
